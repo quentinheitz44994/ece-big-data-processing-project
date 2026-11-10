@@ -1,0 +1,6 @@
+# Whitelist: the images only need the dependency lists and the Spark logging
+# configuration. Source code, configuration and data are bind-mounted at runtime.
+*
+!requirements.txt
+!requirements-producer.txt
+!docker/spark/log4j2.properties
