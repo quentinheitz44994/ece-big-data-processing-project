@@ -28,6 +28,7 @@ select = [
 ignore = [
     "D105", # docstring in magic method
     "D107", # docstring in __init__ (documented at class level)
+    "N812", # `from pyspark.sql import functions as F` is the PySpark convention
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -35,6 +36,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
+"tests/factory.py" = ["D", "E501"] # table-like synthetic rows
 
 [tool.ruff.lint.isort]
 known-first-party = ["imdb_project"]
