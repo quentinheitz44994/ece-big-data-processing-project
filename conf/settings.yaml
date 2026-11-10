@@ -28,6 +28,11 @@ ingestion:
   # tables at the same time.
   parallel_tables: 3
 
+preparation:
+  null_profile:
+    # Number of columns listed in the "highest percentage of missing values" ranking.
+    top_n: 5
+
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
   topic: wikistreams
