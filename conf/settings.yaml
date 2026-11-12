@@ -91,6 +91,36 @@ preparation:
     # Key sets up to this size are broadcast when matched against a table.
     broadcast_max_keys: 2000000
 
+# ---------------------------------------------------------------- 2. exploration
+exploration:
+  # Feature-length film (AMPAS / BFI definition: 40 minutes or more).
+  feature_film:
+    title_types: [movie]
+    min_runtime_minutes: 40
+    include_adult: false
+  # Minimum number of votes of a title for any analysis based on ratings.
+  # A question can override it with its own `min_votes`.
+  min_votes: 1000
+  # Maximum number of rows of a CSV export versioned in outputs/ (the complete
+  # result is always written to data/gold/exploration/).
+  max_csv_rows: 50000
+
+  q1:
+    # Outlier when |z-score| > z_threshold ...
+    z_threshold: 2.0
+    # ... or when the runtime is outside [Q1 - k*IQR, Q3 + k*IQR].
+    iqr_multiplier: 1.5
+    # Genres with fewer films are not analysed.
+    min_films_per_genre: 30
+    # Outliers listed per genre in the Markdown report.
+    top_per_genre: 20
+
+  # q2 parameters are shared with q3.
+  q2:
+    year_min: 1980
+    year_max: 2025
+    top_n: 3
+
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
   topic: wikistreams
