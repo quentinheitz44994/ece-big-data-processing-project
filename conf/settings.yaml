@@ -27,6 +27,8 @@ ingestion:
   # Raw gzip files are not splittable (one Spark task each): convert several
   # tables at the same time.
   parallel_tables: 3
+  # Rows per bronze Parquet file: one input split per file for the later jobs.
+  max_records_per_file: 2000000
 
 preparation:
   null_profile:
