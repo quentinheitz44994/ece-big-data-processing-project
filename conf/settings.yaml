@@ -121,6 +121,29 @@ exploration:
     year_max: 2025
     top_n: 3
 
+  q4:
+    # A film is a "hit" from this rating.
+    high_rating: 8.0
+    # Maximum mean rating of the other films of the director.
+    low_average: 6.0
+    # "Multiple other movies": at least this many.
+    min_other_films: 2
+    # Rows shown in the Markdown report (the CSV holds the complete list).
+    max_md_rows: 50
+
+  q5:
+    series_types: [tvSeries, tvMiniSeries]
+    min_seasons: 3
+    min_episodes_per_season: 10
+    # Minimum number of votes of an episode to be taken into account.
+    min_votes_episode: 50
+    # The best episode must be in a season numbered <= first_seasons.
+    first_seasons: 2
+    # Ties for best / worst episode: "all" tied episodes must satisfy the
+    # condition, or "any" of them.
+    tie_policy: all
+    max_md_rows: 50
+
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
   topic: wikistreams
