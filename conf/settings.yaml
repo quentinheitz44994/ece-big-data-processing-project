@@ -275,12 +275,52 @@ wikimedia:
   sparql_endpoint: https://query.wikidata.org/sparql
   # Action API endpoint of a Wikipedia language edition.
   wikipedia_api: "https://{language}.wikipedia.org/w/api.php"
+  # Wikimedia EventStreams (Server-Sent Events): the single recentchange stream.
+  eventstreams_url: https://stream.wikimedia.org/v2/stream/recentchange
   # Number of IMDb identifiers per SPARQL query.
   sparql_batch_size: 200
   # Wikipedias whose page titles are resolved through Wikidata sitelinks.
   sitelink_wikis: [enwiki, frwiki]
   # Language of the labels of Wikidata entities (places, countries, languages).
   label_language: en
+
+# ----------------------------------------------------------------- 4. streaming
+streaming:
+  # Wikis followed by the producer and present in the lookup table.
+  wikis: [enwiki, frwiki]
+
+  producer:
+    # Run duration of the producer container (0 = until stopped).
+    duration_minutes: 30
+    # Light filter applied before publishing to Kafka.
+    change_types: [edit, new]
+    namespaces: [0]
+    reconnect_delay_seconds: 5
+    stats_path: data/streaming/producer_stats.json
+
+  # Static lookup of Wikipedia pages linked to IMDb identifiers (build_lookup.py).
+  # titles / people / principal_categories can be set to null to lift the limit.
+  lookup:
+    # Most voted titles of these types (IMDb titleType -> entity type).
+    titles: 30000
+    title_types:
+      movie: film
+      tvMovie: film
+      tvSeries: tv_series
+      tvMiniSeries: tv_series
+    # People with the most votes over the titles they are credited in.
+    people: 20000
+    principal_categories: [actor, actress, director, writer]
+
+  # A page whose title matches one of these patterns is relevant even when it is
+  # not in the lookup table (first match gives the entity type).
+  title_patterns:
+    - entity_type: film
+      pattern: '\((?:[^()]* )?film(?:, \d{4})?\)$'
+    - entity_type: tv_series
+      pattern: '\((?:[^()]* )?(?:TV series|TV programme|TV program|miniseries|série télévisée)(?:, \d{4})?\)$'
+    - entity_type: person
+      pattern: '\((?:[^()]* )?(?:actor|actress|director|filmmaker|screenwriter|acteur|actrice|réalisateur|réalisatrice)\)$'
 
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
