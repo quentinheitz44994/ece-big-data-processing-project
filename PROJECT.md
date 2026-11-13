@@ -86,7 +86,7 @@ and not needed to reproduce the report.
 | 3. Data exploration | `docker compose exec spark bash scripts/run_exploration.sh` | DURATION_EXPLORATION | `data/gold/exploration/`, `outputs/exploration/` |
 | 4. Data enrichment | `docker compose exec spark bash scripts/run_enrichment.sh` | DURATION_ENRICHMENT | `data/enrichment/`, `data/gold/enriched_*`, `outputs/enrichment/` |
 | 5a. Start the producer | `docker compose --profile streaming up -d producer` | a few seconds | events in the Kafka topic `wikistreams` |
-| 5b. Streaming job (pending implementation) | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | planned: `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
+| 5b. Streaming job | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
 | 6. Open question (pending author choice and implementation) | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | planned: `data/gold/open_question/`, `outputs/open_question/` |
 | 7. Render the report (pending implementation) | `docker compose exec spark python scripts/render_report.py` | not measured | planned: generated tables injected in `REPORT.md` |
 
@@ -95,8 +95,8 @@ repository on the Windows drive.
 
 Notes per step:
 
-Steps 5b, 6 and 7 describe the planned interface. Their scripts and `REPORT.md` are
-not delivered by PRs #1–#13 or the review-fix branch. Run those steps only after
+Steps 6 and 7 describe the planned interface. Their scripts and `REPORT.md` are
+not delivered yet. Run those steps only after
 the corresponding implementations have landed and been tested. `DURATION_*`
 fields are placeholders, not measurements from Maxence's installation.
 
@@ -125,7 +125,28 @@ fields are placeholders, not measurements from Maxence's installation.
    Wikipedia pages linked to IMDb identifiers (first run only), runs the three
    streaming queries for `streaming.run_minutes` (20 by default; another duration
    can be given as argument, e.g. `bash scripts/run_streaming.sh 30`), injects the
-   late test events and writes the summary. Follow the producer with
+   late test events and writes the summary. Events are deduplicated within the
+   watermark; finalized window batches are written to Parquet and shown on the
+   console. Each query has its own checkpoint and resumes on subsequent runs.
+   `streaming.starting_offsets` is used only for a fresh checkpoint (default:
+   earliest). Keep checkpoint and sink folders together; changing a window or
+   state schema or `streaming.shuffle_partitions` requires a new configured
+   checkpoint/sink set. Streaming uses its own partition count (4 by default),
+   independently of the larger batch setting.
+   Shutdown first waits for idle trigger boundaries, for at most
+   `streaming.stop_grace_seconds`, then calls `stop()` on remaining queries.
+   This grace and report generation are additional to the requested run duration.
+
+   Progress is appended to `outputs/streaming/progress.jsonl`. The summary selects
+   the current application run and reports inputs separately for each query;
+   sliding-window counts are not distinct-event counts. Window state resumes
+   across runs: windows finalized in the current run can contain edits read in
+   an earlier run; matched-event counts select only newly appended current-run
+   events. A short run may produce
+   matched events before any window becomes final. Late injection waits for
+   observed watermarks and uses new event ids; compare its observation table
+   with the measured watermark-drop counters rather than assuming delivery
+   implies acceptance. Follow the producer with
    `docker compose logs -f producer`.
 7. **Report.** `render_report.py` only replaces the blocks between `AUTO` markers
    of `REPORT.md`; the text written by the authors is never touched.
@@ -227,8 +248,9 @@ is collected.
 
 | Tool | Model | Tasks that relied on it |
 | --- | --- | --- |
-| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. The Structured Streaming job, open question implementation and report renderer remain pending. |
+| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. |
 | Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
+| Codex (OpenAI), in the streaming session driven by Maxence SIMONET | GPT-6 | Implementation of Kafka JSON parsing, watermark deduplication, tumbling/sliding queries, append Parquet/console output, progress listener, late-event injection, timed shutdown and generated streaming tables; shell entry point, execution-guide updates and synthetic regression/integration tests. No `REPORT.md` prose was generated. |
 
 - The brief given to the tool is versioned in [CLAUDE.md](CLAUDE.md): it fixes the
   architecture, the definitions and the default thresholds that the tool
