@@ -216,6 +216,39 @@ exploration:
     min_titles_per_role: 3
     max_md_rows: 30
 
+# ---------------------------------------------------------------- 3. enrichment
+enrichment:
+  # Any of the five scope parameters can be set to null to lift the restriction
+  # (up to the whole dataset) without touching the code.
+  scope:
+    year_min: 1980
+    year_max: 2025
+    # Films kept per (genre, year)...
+    top_n: 10
+    # ...ranked by these columns, descending (ties broken by tconst).
+    rank_by: [numVotes, averageRating]
+    # Principals kept per film: the first N distinct people by `ordering`...
+    principals_per_film: 3
+    # ...among these categories.
+    principal_categories: [actor, actress, director, writer]
+  # Wikipedia language edition used as the single text source.
+  wikipedia_language: en
+  # Pages per request for the lead sections of people (API maximum: 20).
+  person_batch_size: 20
+  # Number of unparsable cache files tolerated when reading the raw responses.
+  max_corrupt_records: 0
+  # Section headings accepted as the synopsis, in order of preference.
+  plot_section_titles: [Plot, Synopsis, Plot summary, Plot synopsis, Premise, Summary, Storyline, Story]
+  # Shorter texts are kept but reported as "partial".
+  min_synopsis_chars: 200
+  min_biography_chars: 100
+  # Licence of the Wikipedia text and of the Wikidata statements.
+  text_license: CC BY-SA 4.0
+  facts_license: CC0 1.0
+  # Rows shown in outputs/enrichment/sample.md and characters kept per text.
+  sample_rows: 10
+  sample_text_chars: 300
+
 # --------------------------------------------------------- Wikimedia API access
 # Used by every collection step (enrichment, exploration Q6, streaming lookup).
 wikimedia:
@@ -240,6 +273,8 @@ wikimedia:
     # "enforce": refuse any URL disallowed by robots.txt (nothing is collected).
     policy: report
   sparql_endpoint: https://query.wikidata.org/sparql
+  # Action API endpoint of a Wikipedia language edition.
+  wikipedia_api: "https://{language}.wikipedia.org/w/api.php"
   # Number of IMDb identifiers per SPARQL query.
   sparql_batch_size: 200
   # Wikipedias whose page titles are resolved through Wikidata sitelinks.
