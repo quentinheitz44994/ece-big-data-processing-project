@@ -11,7 +11,7 @@ Apache Kafka. Course: ECE Paris, Big Data Processing, fall 2026.
 | Name | GitHub username | Email |
 | --- | --- | --- |
 | Quentin HEITZ | quentinheitz44994 | EMAIL_TO_COMPLETE |
-| Maxence SIMONET | GITHUB_USERNAME_TO_COMPLETE | EMAIL_TO_COMPLETE |
+| Maxence SIMONET | maxence808 | maxence.simonet@outlook.com |
 
 Group: gr-XX
 
@@ -20,13 +20,18 @@ Group: gr-XX
 | Requirement | Detail |
 | --- | --- |
 | Docker | Docker Desktop, or Docker Engine with the Compose v2 plugin |
-| Shell | bash (Linux, macOS, or **WSL2 on Windows**) |
+| Shell | PowerShell on Windows; bash on Linux, macOS, or WSL2 |
 | Memory | 16 GB on the host, about 10 GB available to Docker |
 | Disk | about 25 GB free (Spark image 7 GB, data layers about 9 GB, Spark temporary files) |
 | Network | `datasets.imdbws.com`, `quay.io`, Docker Hub, Maven Central (image build), Wikimedia APIs |
 
-On Windows, run every command from a WSL2 terminal (not PowerShell or cmd). To
-give Docker 10 GB, create or edit `C:\Users\<you>\.wslconfig`:
+On Windows, Docker Compose commands can run directly from PowerShell with Docker
+Desktop using Linux containers. Bash scripts run **inside** the Spark container
+through `docker compose exec spark bash ...`; a separate Ubuntu installation is
+not required. A WSL2 terminal is also supported.
+
+When Docker Desktop uses its WSL2 backend, give Docker 10 GB by creating or editing
+`C:\Users\<you>\.wslconfig`:
 
 ```ini
 [wsl2]
@@ -38,7 +43,9 @@ then run `wsl --shutdown` and restart Docker Desktop. With less memory, lower
 8 GB Docker VM).
 
 The container user is `jovyan` (uid 1000). On a Linux host whose user has another
-uid, make the mounted folders writable first: `chmod -R a+rwX data outputs REPORT.md`.
+uid, make the existing mounted output folders writable first:
+`chmod -R a+rwX data outputs`. Apply the same permission adjustment to `REPORT.md`
+after that file has been created.
 
 ## 3. Run the project from scratch
 
@@ -54,6 +61,9 @@ cp .env.example .env
 # collection steps refuse to run without it.
 docker compose up -d --build
 ```
+
+In PowerShell, use `Copy-Item .env.example .env` for the copy step; the Docker
+Compose commands are identical. Preserve an existing `.env` when resuming.
 
 Checks:
 
@@ -76,25 +86,35 @@ and not needed to reproduce the report.
 | 3. Data exploration | `docker compose exec spark bash scripts/run_exploration.sh` | DURATION_EXPLORATION | `data/gold/exploration/`, `outputs/exploration/` |
 | 4. Data enrichment | `docker compose exec spark bash scripts/run_enrichment.sh` | DURATION_ENRICHMENT | `data/enrichment/`, `data/gold/enriched_*`, `outputs/enrichment/` |
 | 5a. Start the producer | `docker compose --profile streaming up -d producer` | a few seconds | events in the Kafka topic `wikistreams` |
-| 5b. Streaming job | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
-| 6. Open question | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | `data/gold/open_question/`, `outputs/open_question/` |
-| 7. Render the report | `docker compose exec spark python scripts/render_report.py` | a few seconds | generated tables injected in `REPORT.md` |
+| 5b. Streaming job (pending implementation) | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | planned: `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
+| 6. Open question (pending author choice and implementation) | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | planned: `data/gold/open_question/`, `outputs/open_question/` |
+| 7. Render the report (pending implementation) | `docker compose exec spark python scripts/render_report.py` | not measured | planned: generated tables injected in `REPORT.md` |
 
 (*) Measured on a 12-core laptop, Docker VM with 8 GB, `SPARK_DRIVER_MEMORY=5g`,
 repository on the Windows drive.
 
 Notes per step:
 
-1. **Download.** Files already present are skipped (`--force` downloads again).
+Steps 5b, 6 and 7 describe the planned interface. Their scripts and `REPORT.md` are
+not delivered by PRs #1–#13 or the review-fix branch. Run those steps only after
+the corresponding implementations have landed and been tested. `DURATION_*`
+fields are placeholders, not measurements from Maxence's installation.
+
+1. **Download.** Existing files are checked with `gzip --test` before being
+   skipped (`--force` downloads again). An invalid existing archive fails the step
+   with a request to download it again.
    The IMDb files change every day: the snapshot used is recorded in
    `outputs/data_snapshot.md`.
 2. **Preparation** chains four jobs: `ingest` (TSV to bronze Parquet),
-   `null_profile`, `quality_checks` (rules DQ01 to DQ15) and `cleaning` (silver
+   `null_profile`, `quality_checks` (rules DQ01 to DQ16) and `cleaning` (silver
    and quarantine). `SKIP_INGEST=1` reuses an existing bronze layer:
    `docker compose exec -e SKIP_INGEST=1 spark bash scripts/run_preparation.sh`.
 3. **Exploration** runs the eight questions; one or several can be selected:
    `bash scripts/run_exploration.sh q4 q5`. Q6 queries Wikidata (original language
    of the successful films), through the same client and cache as the enrichment.
+   CSV exports are capped by `exploration.max_csv_rows`; each report and its
+   `<question>_exports.csv` manifest show total/exported rows, truncation, and the
+   gold directory containing the complete results.
 4. **Enrichment** has a long collection step (sequential requests, at most one
    per second). Every raw response is cached under `data/enrichment/raw/`: if the
    step is interrupted, run the script again and it resumes where it stopped.
@@ -116,8 +136,10 @@ Notes per step:
 ```bash
 docker compose --profile streaming down      # stop the containers
 docker compose --profile streaming down -v   # also remove the anonymous volumes
-rm -rf data/bronze data/silver data/quarantine data/gold data/enrichment data/streaming
 ```
+
+To remove generated data, select the intended `data/` subdirectories in your host
+shell or file manager. Keep `data/raw/` to reuse the downloaded IMDb archives.
 
 ## 4. Troubleshooting
 
@@ -131,7 +153,7 @@ rm -rf data/bronze data/silver data/quarantine data/gold data/enrichment data/st
 | The streaming job reports no relevant event | The producer is not running or has finished: `docker compose --profile streaming up -d producer`, check `docker compose logs producer`. |
 | `UnknownTopicOrPartitionException` | The topic was not created: `docker compose up -d kafka-init`. |
 | `RobotsDisallowedError` | `wikimedia.robots.policy` is set to `enforce` in `conf/settings.yaml` (see section 6). |
-| A job fails after an interrupted run | Run the script again: every job overwrites its outputs; the streaming job starts from empty sinks and checkpoints. |
+| A batch job fails after an interrupted run | Run the script again: batch jobs overwrite their outputs and collectors reuse successful cached API responses. The pending streaming job must document its own checkpoint/reset behaviour. |
 
 ## 5. Repository structure
 
@@ -152,7 +174,7 @@ rm -rf data/bronze data/silver data/quarantine data/gold data/enrichment data/st
 │   │                             # select_scope, build_enrichment
 │   ├── streaming/                # admin, producer, relevance, build_lookup, stream_job,
 │   │                             # metrics_listener, late_event_injector, summary
-│   └── open_question/            # director_actor_duos
+│   └── open_question/            # planned; question and module chosen by the authors
 ├── tests/                        # pytest, synthetic data only, no network access
 ├── outputs/                      # generated tables (Markdown, CSV) injected in REPORT.md
 ├── notebooks/                    # optional interactive exploration
@@ -205,7 +227,8 @@ is collected.
 
 | Tool | Model | Tasks that relied on it |
 | --- | --- | --- |
-| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 | Generation and debugging of the whole code base: Docker and Compose configuration, PySpark batch and streaming jobs, HTTP collection clients, shell scripts, `conf/settings.yaml`, unit tests. Execution of the pipeline and generation of the result tables in `outputs/`. Drafting of the commit messages and pull request descriptions, of `README.md`, of this `PROJECT.md`, and of the skeleton of `REPORT.md` (headings, markers and placeholders only). |
+| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. The Structured Streaming job, open question implementation and report renderer remain pending. |
+| Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
 
 - The brief given to the tool is versioned in [CLAUDE.md](CLAUDE.md): it fixes the
   architecture, the definitions and the default thresholds that the tool

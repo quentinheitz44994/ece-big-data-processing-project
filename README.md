@@ -2,7 +2,7 @@
 
 - Group: gr-XX
 - Quentin HEITZ, quentinheitz44994
-- Maxence SIMONET, GITHUB_USERNAME_TO_COMPLETE
+- Maxence SIMONET, maxence808
 
 IMDb analytics with Apache Spark (batch and Structured Streaming) and Apache Kafka.
 
