@@ -27,11 +27,69 @@ ingestion:
   # Raw gzip files are not splittable (one Spark task each): convert several
   # tables at the same time.
   parallel_tables: 3
+  # Rows per bronze Parquet file: one input split per file for the later jobs.
+  max_records_per_file: 2000000
 
 preparation:
   null_profile:
     # Number of columns listed in the "highest percentage of missing values" ranking.
     top_n: 5
+
+  quality:
+    # Year used by the "in the future" rules. null = current year at run time.
+    reference_year: null
+    # DQ02: maximum plausible age at death.
+    max_age_years: 120
+    # DQ03: a credit more than N years after the death of the person is reported...
+    posthumous_grace_years: 5
+    # ...unless its category is one of these (archive material, or roles for
+    # which posthumous credits are ordinary: adapted authors, composers)...
+    posthumous_exempt_categories: [archive_footage, archive_sound, writer, composer]
+    # ...or its job / characters match this pattern.
+    archive_pattern: "(?i)archive"
+    # DQ07: titles announced more than N years after the reference year.
+    max_future_years: 5
+    # DQ08: runtime above this value (minutes) is reported as aberrant.
+    max_runtime_minutes: 1000
+    # DQ12: valid range of averageRating.
+    rating_min: 1.0
+    rating_max: 10.0
+    # DQ04 / DQ11: title types that can own episodes.
+    episode_parent_types: [tvSeries, tvMiniSeries]
+    # DQ13: genres documented by IMDb.
+    known_genres:
+      - Action
+      - Adult
+      - Adventure
+      - Animation
+      - Biography
+      - Comedy
+      - Crime
+      - Documentary
+      - Drama
+      - Family
+      - Fantasy
+      - Film-Noir
+      - Game-Show
+      - History
+      - Horror
+      - Music
+      - Musical
+      - Mystery
+      - News
+      - Reality-TV
+      - Romance
+      - Sci-Fi
+      - Short
+      - Sport
+      - Talk-Show
+      - Thriller
+      - War
+      - Western
+    # Number of sample rows kept per rule in quality_samples.md.
+    sample_size: 10
+    # Key sets up to this size are broadcast when matched against a table.
+    broadcast_max_keys: 2000000
 
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}

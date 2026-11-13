@@ -19,7 +19,7 @@ def test_profile_table_counts_each_kind_of_missing_value(spark):
             ("\\N", "[]"),
             ("", " [] "),
             ("  ", ""),
-            (" ", "z"),
+            ("\u00a0", "z"),
             ("b", None),
         ],
         "scalar string, multi string",
