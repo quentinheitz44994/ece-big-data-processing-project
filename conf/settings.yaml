@@ -200,7 +200,7 @@ exploration:
     min_career_years: 20
     min_films: 15
     # The best-rated film must fall within this first share of the career.
-    early_fraction: 0.3333
+    early_fraction: {numerator: 1, denominator: 3}
     # Number of best-rated films averaged in top_k_mean_position.
     top_k: 3
     max_md_rows: 50

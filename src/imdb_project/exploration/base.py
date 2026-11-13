@@ -155,12 +155,25 @@ def write_report(
             ``<name>.csv`` for the key ``""``), capped at
             ``exploration.max_csv_rows`` rows.
     """
-    io.write_markdown(io.output_path(cfg, SECTION, f"{name}.md"), title, tables, parameters)
     max_rows = int(cfg.get(f"{SECTION}.max_csv_rows", 50_000))
+    if max_rows < 1:
+        raise ValueError("exploration.max_csv_rows must be positive")
+    exports = []
     for key, df in (csv_exports or {}).items():
+        total = df.count()
         columns, rows = io.collect_rows(df, max_rows)
         suffix = f"_{key}" if key else ""
-        io.write_csv(io.output_path(cfg, SECTION, f"{name}{suffix}.csv"), columns, rows)
+        filename = f"{name}{suffix}.csv"
+        io.write_csv(io.output_path(cfg, SECTION, filename), columns, rows)
+        exports.append(
+            [filename, total, len(rows), len(rows) < total, io.layer_path(cfg, "gold", SECTION)]
+        )
+    report_tables = list(tables)
+    if exports:
+        columns = ["file", "total_rows", "exported_rows", "truncated", "gold_directory"]
+        report_tables.append(io.ReportTable(columns, exports, title="CSV exports"))
+        io.write_csv(io.output_path(cfg, SECTION, f"{name}_exports.csv"), columns, exports)
+    io.write_markdown(io.output_path(cfg, SECTION, f"{name}.md"), title, report_tables, parameters)
 
 
 def run_job(name: str, run: Callable[[SparkSession, Config], Any], description: str) -> None:

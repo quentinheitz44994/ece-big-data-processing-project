@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,19 @@ from helpers import movie, rating, silver_df, write_silver
 from imdb_project.exploration import base, q1_runtime_outliers, q2_top_genres, q3_top_vs_rest
 
 RUNTIMES = [50, 90, 90, 90, 90, 100, 100, 100, 100, 110, 110, 110, 110, 400]
+
+
+def test_csv_export_limits_are_reported_explicitly(spark, cfg):
+    configured = cfg.with_overrides({"exploration.max_csv_rows": 1})
+    df = spark.createDataFrame([(1,), (2,), (3,)], "value int").orderBy("value")
+    base.write_report(configured, "review", "Review", {}, [], csv_exports={"": df})
+    folder = Path(cfg.paths.outputs, "exploration")
+    with (folder / "review_exports.csv").open() as handle:
+        (export,) = csv.DictReader(handle)
+    assert export["total_rows"] == "3" and export["exported_rows"] == "1"
+    assert export["truncated"] == "true" and export["gold_directory"].endswith("exploration")
+    assert "| review.csv | 3 | 1 | true |" in (folder / "review.md").read_text()
+    assert (folder / "review.csv").read_text().splitlines() == ["value", "1"]
 
 
 def _genre_films(spark):

@@ -8,7 +8,7 @@ A series is selected when:
 * it has at least ``min_seasons`` seasons with at least
   ``min_episodes_per_season`` such episodes;
 * its worst episode (lowest ``averageRating``) is in its last season, i.e. the
-  highest season number among the episodes considered;
+  highest positive season number in the source episode table, before vote filtering;
 * its best episode (highest ``averageRating``) is in a season numbered
   ``<= first_seasons``.
 
@@ -48,7 +48,7 @@ def rated_series_episodes(
 
     Returns:
         Columns ``parentTconst``, ``tconst``, ``seasonNumber``, ``episodeNumber``,
-        ``averageRating``, ``numVotes``.
+        ``averageRating``, ``numVotes``, ``last_season`` (before vote filtering).
     """
     series = titles.where(F.col("titleType").isin(series_types)).select(
         F.col("tconst").alias("parentTconst")
@@ -56,8 +56,11 @@ def rated_series_episodes(
     usable = episodes.where(F.col("seasonNumber") > 0).select(
         "tconst", "parentTconst", "seasonNumber", "episodeNumber"
     )
-    return base.with_ratings(usable, ratings, min_votes_episode).join(
-        F.broadcast(series), "parentTconst", "left_semi"
+    final_seasons = usable.groupBy("parentTconst").agg(F.max("seasonNumber").alias("last_season"))
+    return (
+        base.with_ratings(usable, ratings, min_votes_episode)
+        .join(F.broadcast(series), "parentTconst", "left_semi")
+        .join(final_seasons, "parentTconst")
     )
 
 
@@ -98,11 +101,13 @@ def series_decline(
     stats = candidates.groupBy("parentTconst").agg(
         F.min("averageRating").alias("worst_rating"),
         F.max("averageRating").alias("best_rating"),
-        F.max("seasonNumber").alias("last_season"),
+        F.max("last_season" if "last_season" in episodes.columns else "seasonNumber").alias(
+            "last_season"
+        ),
         F.countDistinct("seasonNumber").alias("n_seasons"),
         F.count(F.lit(1)).alias("n_rated_episodes"),
     )
-    marked = candidates.join(stats, "parentTconst")
+    marked = candidates.drop("last_season").join(stats, "parentTconst")
     is_worst = F.col("averageRating") == F.col("worst_rating")
     is_best = F.col("averageRating") == F.col("best_rating")
     position = F.struct(
@@ -238,7 +243,7 @@ def run(spark: SparkSession, cfg: Config) -> DataFrame:
         "min_votes_episode": min_votes_episode,
         "first_seasons": first_seasons,
         "tie_policy": tie_policy,
-        "last_season": "highest season number among the rated episodes of the series",
+        "last_season": "highest positive season number before rating and vote filtering",
         "series_with_enough_eligible_seasons": n_candidates,
         "series_selected": total,
         "sorted_by": "n_rated_episodes desc",

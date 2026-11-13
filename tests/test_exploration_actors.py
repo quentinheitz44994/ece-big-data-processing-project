@@ -288,6 +288,21 @@ def _filmography(spark):
     )
 
 
+def test_q7_includes_the_exact_first_third_boundary(spark, settings):
+    rows = _career(
+        "boundary", {year: 9.0 if year == 1990 else 2.0 if year <= 1994 else 1.0 for year in YEARS}
+    )
+    films = spark.createDataFrame(
+        rows, "nconst string, tconst string, startYear int, averageRating double, numVotes int"
+    )
+    fraction = q7_early_peak_actors.career_fraction(settings)
+    (career,) = q7_early_peak_actors.early_peak(
+        films, q7_early_peak_actors.career_profiles(films, 20, 15), fraction, 3
+    ).collect()
+    assert career.peak_position == fraction == 1 / 3
+    assert career.early_peak is True
+
+
 def test_q7_career_profiles_and_early_peak(spark):
     filmography = _filmography(spark)
     profiles = q7_early_peak_actors.career_profiles(filmography, 20, 15)
