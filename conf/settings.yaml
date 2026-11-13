@@ -288,6 +288,44 @@ wikimedia:
 
 # ----------------------------------------------------------------- 4. streaming
 streaming:
+  run_minutes: 20
+  watermark_delay: "10 minutes"
+  trigger_interval: "10 seconds"
+  starting_offsets: earliest
+  max_offsets_per_trigger: 20000
+  shuffle_partitions: 4
+  controller_poll_seconds: 1
+  listener_wait_seconds: 30
+  stop_grace_seconds: 30
+  console_rows: 20
+  tumbling: {duration: "5 minutes", slide: "5 minutes"}
+  sliding: {duration: "10 minutes", slide: "5 minutes"}
+  sinks:
+    matched_events: matched_events
+    tumbling: tumbling
+    sliding: sliding
+  checkpoints:
+    matched_events: checkpoints/matched_events
+    tumbling: checkpoints/tumbling
+    sliding: checkpoints/sliding
+  progress_file: streaming/progress.jsonl
+  run_file: streaming/run.json
+  summary_file: streaming/summary.md
+  late_events:
+    enabled: true
+    after_minutes: 12
+    # Ages before the greatest event timestamp observed by the queries.
+    offsets_minutes: [30, 5]
+    sample_size: 5
+    enqueue_timeout_seconds: 30
+    poll_seconds: 0.1
+    flush_timeout_seconds: 30
+    report_file: streaming/injections.json
+  report:
+    max_batch_rows: 60
+    max_window_rows: 30
+    max_examples: 10
+
   # Wikis followed by the producer and present in the lookup table.
   wikis: [enwiki, frwiki]
 
