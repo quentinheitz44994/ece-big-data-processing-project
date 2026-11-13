@@ -65,3 +65,18 @@ def bronze_cfg(spark: SparkSession, raw_cfg: Config) -> Config:
 
     ingest.run(spark, raw_cfg)
     return raw_cfg
+
+
+@pytest.fixture(scope="session")
+def cleaning_summary(spark: SparkSession, bronze_cfg: Config) -> dict:
+    """Summary tables returned by the cleaning job on the mini dataset."""
+    from imdb_project.preparation import cleaning
+
+    cfg = bronze_cfg.with_overrides({"preparation.quality.reference_year": 2026})
+    return cleaning.run(spark, cfg)
+
+
+@pytest.fixture(scope="session")
+def silver_cfg(bronze_cfg: Config, cleaning_summary: dict) -> Config:
+    """Settings whose silver and quarantine layers have been built."""
+    return bronze_cfg.with_overrides({"preparation.quality.reference_year": 2026})

@@ -33,7 +33,7 @@ LOGGER = get_logger(__name__)
 
 IMDB_NULL_MARKER = "\\N"
 #: Whitespace-only values (ASCII whitespace and non-breaking space).
-WHITESPACE_ONLY_PATTERN = r"^[\s ]+$"
+WHITESPACE_ONLY_PATTERN = r"^[\s\u00a0]+$"
 
 METRICS = ("n_null", "n_backslash_n", "n_empty", "n_whitespace", "n_empty_array")
 PROFILE_COLUMNS = (

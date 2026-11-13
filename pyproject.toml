@@ -37,6 +37,9 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
 "tests/factory.py" = ["D", "E501"] # table-like synthetic rows
+"tests/test_enrichment.py" = ["D", "E501"] # canned API responses
+"tests/streaming_fakes.py" = ["D", "E501"] # canned events
+"tests/test_streaming_producer.py" = ["D", "E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["imdb_project"]

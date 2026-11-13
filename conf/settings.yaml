@@ -27,11 +27,300 @@ ingestion:
   # Raw gzip files are not splittable (one Spark task each): convert several
   # tables at the same time.
   parallel_tables: 3
+  # Rows per bronze Parquet file: one input split per file for the later jobs.
+  max_records_per_file: 2000000
 
 preparation:
   null_profile:
     # Number of columns listed in the "highest percentage of missing values" ranking.
     top_n: 5
+
+  quality:
+    # Year used by the "in the future" rules. null = current year at run time.
+    reference_year: null
+    # DQ02: maximum plausible age at death.
+    max_age_years: 120
+    # DQ03: a credit more than N years after the death of the person is reported...
+    posthumous_grace_years: 5
+    # ...unless its category is one of these (archive material, or roles for
+    # which posthumous credits are ordinary: adapted authors, composers)...
+    posthumous_exempt_categories: [archive_footage, archive_sound, writer, composer]
+    # ...or its job / characters match this pattern.
+    archive_pattern: "(?i)archive"
+    # DQ07: titles announced more than N years after the reference year.
+    max_future_years: 5
+    # DQ08: runtime above this value (minutes) is reported as aberrant.
+    max_runtime_minutes: 1000
+    # DQ12: valid range of averageRating.
+    rating_min: 1.0
+    rating_max: 10.0
+    # DQ04 / DQ11: title types that can own episodes.
+    episode_parent_types: [tvSeries, tvMiniSeries]
+    # DQ13: genres documented by IMDb.
+    known_genres:
+      - Action
+      - Adult
+      - Adventure
+      - Animation
+      - Biography
+      - Comedy
+      - Crime
+      - Documentary
+      - Drama
+      - Family
+      - Fantasy
+      - Film-Noir
+      - Game-Show
+      - History
+      - Horror
+      - Music
+      - Musical
+      - Mystery
+      - News
+      - Reality-TV
+      - Romance
+      - Sci-Fi
+      - Short
+      - Sport
+      - Talk-Show
+      - Thriller
+      - War
+      - Western
+    # Number of sample rows kept per rule in quality_samples.md.
+    sample_size: 10
+    # Key sets up to this size are broadcast when matched against a table.
+    broadcast_max_keys: 2000000
+
+# ---------------------------------------------------------------- 2. exploration
+exploration:
+  # Feature-length film (AMPAS / BFI definition: 40 minutes or more).
+  feature_film:
+    title_types: [movie]
+    min_runtime_minutes: 40
+    include_adult: false
+  # Minimum number of votes of a title for any analysis based on ratings.
+  # A question can override it with its own `min_votes`.
+  min_votes: 1000
+  # Maximum number of rows of a CSV export versioned in outputs/ (the complete
+  # result is always written to data/gold/exploration/).
+  max_csv_rows: 50000
+
+  q1:
+    # Outlier when |z-score| > z_threshold ...
+    z_threshold: 2.0
+    # ... or when the runtime is outside [Q1 - k*IQR, Q3 + k*IQR].
+    iqr_multiplier: 1.5
+    # Genres with fewer films are not analysed.
+    min_films_per_genre: 30
+    # Outliers listed per genre in the Markdown report.
+    top_per_genre: 20
+
+  # q2 parameters are shared with q3.
+  q2:
+    year_min: 1980
+    year_max: 2025
+    top_n: 3
+
+  q4:
+    # A film is a "hit" from this rating.
+    high_rating: 8.0
+    # Maximum mean rating of the other films of the director.
+    low_average: 6.0
+    # "Multiple other movies": at least this many.
+    min_other_films: 2
+    # Rows shown in the Markdown report (the CSV holds the complete list).
+    max_md_rows: 50
+
+  q5:
+    series_types: [tvSeries, tvMiniSeries]
+    min_seasons: 3
+    min_episodes_per_season: 10
+    # Minimum number of votes of an episode to be taken into account.
+    min_votes_episode: 50
+    # The best episode must be in a season numbered <= first_seasons.
+    first_seasons: 2
+    # Ties for best / worst episode: "all" tied episodes must satisfy the
+    # condition, or "any" of them.
+    tie_policy: all
+    max_md_rows: 50
+
+  q6:
+    # A film is "successful" when it reaches both thresholds.
+    min_rating: 7.0
+    min_votes: 10000
+    categories: [actor, actress]
+    # Films with several original languages in Wikidata: "exclude" them (each
+    # film then counts for exactly one language) or "include" all their languages.
+    multilingual_films: exclude
+    # Language codes merged before counting distinct languages.
+    language_aliases:
+      cmn: zh
+      nb: "no"
+      nn: "no"
+    # Fallback when Wikidata has no original language: akas region -> language,
+    # used only when the regions carrying the original title agree on one language.
+    region_languages:
+      US: en
+      GB: en
+      AU: en
+      IE: en
+      NZ: en
+      FR: fr
+      DE: de
+      AT: de
+      IT: it
+      ES: es
+      MX: es
+      AR: es
+      PT: pt
+      BR: pt
+      JP: ja
+      KR: ko
+      CN: zh
+      TW: zh
+      RU: ru
+      SUHH: ru
+      SE: sv
+      DK: da
+      "NO": "no"
+      FI: fi
+      NL: nl
+      PL: pl
+      CZ: cs
+      HU: hu
+      GR: el
+      TR: tr
+      IR: fa
+      IL: he
+      TH: th
+    max_md_rows: 50
+
+  q7:
+    categories: [actor, actress]
+    min_career_years: 20
+    min_films: 15
+    # The best-rated film must fall within this first share of the career.
+    early_fraction: 0.3333
+    # Number of best-rated films averaged in top_k_mean_position.
+    top_k: 3
+    max_md_rows: 50
+
+  q8:
+    # Principal categories mapped to the normalised roles.
+    role_categories:
+      actor: actor
+      actress: actor
+      director: director
+      writer: writer
+    # Films needed in a role for it to count in "multi-talented".
+    min_titles_per_role: 3
+    max_md_rows: 30
+
+# ---------------------------------------------------------------- 3. enrichment
+enrichment:
+  # Any of the five scope parameters can be set to null to lift the restriction
+  # (up to the whole dataset) without touching the code.
+  scope:
+    year_min: 1980
+    year_max: 2025
+    # Films kept per (genre, year)...
+    top_n: 10
+    # ...ranked by these columns, descending (ties broken by tconst).
+    rank_by: [numVotes, averageRating]
+    # Principals kept per film: the first N distinct people by `ordering`...
+    principals_per_film: 3
+    # ...among these categories.
+    principal_categories: [actor, actress, director, writer]
+  # Wikipedia language edition used as the single text source.
+  wikipedia_language: en
+  # Pages per request for the lead sections of people (API maximum: 20).
+  person_batch_size: 20
+  # Number of unparsable cache files tolerated when reading the raw responses.
+  max_corrupt_records: 0
+  # Section headings accepted as the synopsis, in order of preference.
+  plot_section_titles: [Plot, Synopsis, Plot summary, Plot synopsis, Premise, Summary, Storyline, Story]
+  # Shorter texts are kept but reported as "partial".
+  min_synopsis_chars: 200
+  min_biography_chars: 100
+  # Licence of the Wikipedia text and of the Wikidata statements.
+  text_license: CC BY-SA 4.0
+  facts_license: CC0 1.0
+  # Rows shown in outputs/enrichment/sample.md and characters kept per text.
+  sample_rows: 10
+  sample_text_chars: 300
+
+# --------------------------------------------------------- Wikimedia API access
+# Used by every collection step (enrichment, exploration Q6, streaming lookup).
+wikimedia:
+  # User-Agent: "<product> (<contact>) python-requests/<version>".
+  user_agent_product: ECE-BigData-IMDb-Project/1.0
+  contact: ${WIKIMEDIA_CONTACT_EMAIL:-}
+  # Requests are strictly sequential, at most this many per second.
+  max_requests_per_second: 1.0
+  # MediaWiki "maxlag" parameter (seconds): back off when the replicas lag.
+  maxlag_seconds: 5
+  timeout_seconds: 60
+  # Retries on 429 / 5xx / network errors (Retry-After, else exponential back-off).
+  max_retries: 6
+  backoff_base_seconds: 2.0
+  backoff_max_seconds: 120
+  retry_statuses: [429, 500, 502, 503, 504]
+  robots:
+    # robots.txt of every host is read and its verdict is recorded in the
+    # collection statistics. Wikimedia's robots.txt targets crawlers and
+    # disallows /w/ and /sparql for them, although these are the documented
+    # programmatic APIs. "report": log and report the verdict, then proceed.
+    # "enforce": refuse any URL disallowed by robots.txt (nothing is collected).
+    policy: report
+  sparql_endpoint: https://query.wikidata.org/sparql
+  # Action API endpoint of a Wikipedia language edition.
+  wikipedia_api: "https://{language}.wikipedia.org/w/api.php"
+  # Wikimedia EventStreams (Server-Sent Events): the single recentchange stream.
+  eventstreams_url: https://stream.wikimedia.org/v2/stream/recentchange
+  # Number of IMDb identifiers per SPARQL query.
+  sparql_batch_size: 200
+  # Wikipedias whose page titles are resolved through Wikidata sitelinks.
+  sitelink_wikis: [enwiki, frwiki]
+  # Language of the labels of Wikidata entities (places, countries, languages).
+  label_language: en
+
+# ----------------------------------------------------------------- 4. streaming
+streaming:
+  # Wikis followed by the producer and present in the lookup table.
+  wikis: [enwiki, frwiki]
+
+  producer:
+    # Run duration of the producer container (0 = until stopped).
+    duration_minutes: 30
+    # Light filter applied before publishing to Kafka.
+    change_types: [edit, new]
+    namespaces: [0]
+    reconnect_delay_seconds: 5
+    stats_path: data/streaming/producer_stats.json
+
+  # Static lookup of Wikipedia pages linked to IMDb identifiers (build_lookup.py).
+  # titles / people / principal_categories can be set to null to lift the limit.
+  lookup:
+    # Most voted titles of these types (IMDb titleType -> entity type).
+    titles: 30000
+    title_types:
+      movie: film
+      tvMovie: film
+      tvSeries: tv_series
+      tvMiniSeries: tv_series
+    # People with the most votes over the titles they are credited in.
+    people: 20000
+    principal_categories: [actor, actress, director, writer]
+
+  # A page whose title matches one of these patterns is relevant even when it is
+  # not in the lookup table (first match gives the entity type).
+  title_patterns:
+    - entity_type: film
+      pattern: '\((?:[^()]* )?film(?:, \d{4})?\)$'
+    - entity_type: tv_series
+      pattern: '\((?:[^()]* )?(?:TV series|TV programme|TV program|miniseries|série télévisée)(?:, \d{4})?\)$'
+    - entity_type: person
+      pattern: '\((?:[^()]* )?(?:actor|actress|director|filmmaker|screenwriter|acteur|actrice|réalisateur|réalisatrice)\)$'
 
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}

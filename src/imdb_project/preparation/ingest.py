@@ -78,7 +78,13 @@ def ingest_table(spark: SparkSession, cfg: Config, spec: TableSpec) -> dict[str,
         raise FileNotFoundError(f"{source} not found: run scripts/download_imdb.sh first")
 
     started = time.monotonic()
-    io.write_parquet(read_raw_tsv(spark, source, spec), target)
+    # A gzip file is read by a single task. Capping the rows per output file
+    # gives every later job one input split per file, hence parallel scans.
+    io.write_parquet(
+        read_raw_tsv(spark, source, spec),
+        target,
+        max_records_per_file=int(cfg.get("ingestion.max_records_per_file", 2_000_000)),
+    )
     bronze = io.read_parquet(spark, target)
     counts = bronze.agg(
         F.count(F.lit(1)).alias("rows"),
