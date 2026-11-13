@@ -60,6 +60,28 @@ services:
     depends_on:
       - kafka
 
+  # Wikimedia EventStreams -> Kafka. Started on demand:
+  #   docker compose --profile streaming up -d producer
+  producer:
+    profiles: ["streaming"]
+    build:
+      context: .
+      dockerfile: docker/producer/Dockerfile
+    command: ["python", "-m", "imdb_project.streaming.producer"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      WIKIMEDIA_CONTACT_EMAIL: ${WIKIMEDIA_CONTACT_EMAIL:-}
+    volumes:
+      - ./src:/app/src:ro
+      - ./conf:/app/conf:ro
+      - ./data/streaming:/app/data/streaming
+    networks:
+      - kafka-spark-net
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: "no"
+
 networks:
   kafka-spark-net:
     driver: bridge
