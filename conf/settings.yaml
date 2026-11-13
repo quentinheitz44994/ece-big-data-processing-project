@@ -144,6 +144,37 @@ exploration:
     tie_policy: all
     max_md_rows: 50
 
+# --------------------------------------------------------- Wikimedia API access
+# Used by every collection step (enrichment, exploration Q6, streaming lookup).
+wikimedia:
+  # User-Agent: "<product> (<contact>) python-requests/<version>".
+  user_agent_product: ECE-BigData-IMDb-Project/1.0
+  contact: ${WIKIMEDIA_CONTACT_EMAIL:-}
+  # Requests are strictly sequential, at most this many per second.
+  max_requests_per_second: 1.0
+  # MediaWiki "maxlag" parameter (seconds): back off when the replicas lag.
+  maxlag_seconds: 5
+  timeout_seconds: 60
+  # Retries on 429 / 5xx / network errors (Retry-After, else exponential back-off).
+  max_retries: 6
+  backoff_base_seconds: 2.0
+  backoff_max_seconds: 120
+  retry_statuses: [429, 500, 502, 503, 504]
+  robots:
+    # robots.txt of every host is read and its verdict is recorded in the
+    # collection statistics. Wikimedia's robots.txt targets crawlers and
+    # disallows /w/ and /sparql for them, although these are the documented
+    # programmatic APIs. "report": log and report the verdict, then proceed.
+    # "enforce": refuse any URL disallowed by robots.txt (nothing is collected).
+    policy: report
+  sparql_endpoint: https://query.wikidata.org/sparql
+  # Number of IMDb identifiers per SPARQL query.
+  sparql_batch_size: 200
+  # Wikipedias whose page titles are resolved through Wikidata sitelinks.
+  sitelink_wikis: [enwiki, frwiki]
+  # Language of the labels of Wikidata entities (places, countries, languages).
+  label_language: en
+
 kafka:
   bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
   topic: wikistreams
