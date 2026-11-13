@@ -298,6 +298,8 @@ streaming:
     change_types: [edit, new]
     namespaces: [0]
     reconnect_delay_seconds: 5
+    queue_poll_seconds: 0.1
+    flush_timeout_seconds: 30
     stats_path: data/streaming/producer_stats.json
 
   # Static lookup of Wikipedia pages linked to IMDb identifiers (build_lookup.py).
