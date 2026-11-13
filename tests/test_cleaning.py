@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pyspark.sql import functions as F
 
 from imdb_project.common import io
 from imdb_project.common.schemas import TABLES
 from imdb_project.preparation import cleaning
+from imdb_project.preparation.rules import build_rules
+from imdb_project.preparation.standardize import standardize_table
 
 # table: (bronze rows, silver rows, quarantined rows, silver rows with flags)
 EXPECTED_OVERVIEW = {
@@ -156,3 +159,24 @@ def test_silver_title_basics_is_partitioned(silver_cfg):
         "titleType=tvEpisode",
         "titleType=short",
     }
+
+
+@pytest.mark.parametrize(
+    ("table", "values"),
+    [
+        ("name_basics", {"nconst": "\\N", "primaryName": "Missing key"}),
+        ("title_principals", {"tconst": "tt1", "ordering": "bad", "nconst": "nm1"}),
+        ("title_akas", {"titleId": "tt1", "ordering": "\\N"}),
+    ],
+)
+def test_missing_primary_key_components_are_quarantined(spark, cfg, table, values):
+    spec = TABLES[table]
+    raw = spark.createDataFrame(
+        [tuple(values.get(field.name) for field in spec.bronze_schema)], spec.bronze_schema
+    )
+    standardized = standardize_table(raw, spec)
+    key_rules = [rule for rule in build_rules() if rule.rule_id == "DQ16"]
+    silver, quarantine, _ = cleaning.clean_table({table: standardized}, cfg, spec, key_rules, [])
+    assert silver.count() == 0
+    (rejected,) = quarantine.collect()
+    assert rejected.dq_flags == ["DQ16"] and rejected.dq_reason == "DQ16"

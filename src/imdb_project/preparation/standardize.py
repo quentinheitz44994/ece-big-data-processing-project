@@ -10,9 +10,8 @@ exactly the same typed values:
 
 Nothing is imputed: a value is either kept, converted or set to null.
 
-Only native string functions are used (no regular expression on scalar values, no
-lambda): these expressions run on every column of every row of tables holding up
-to a hundred million rows.
+Scalar cleanup uses native string functions. Array elements are normalised with
+Spark higher-order expressions, without any Python UDF.
 """
 
 from __future__ import annotations
@@ -68,7 +67,7 @@ def parse_array(value: Column, encoding: str) -> Column:
         encoding: One of the ``ARRAY_*`` encodings of :mod:`imdb_project.common.schemas`.
 
     Returns:
-        The array of non-empty items, or null when there is none.
+        The trimmed, non-missing items, or null when there is none.
 
     Raises:
         ValueError: If the encoding is unknown.
@@ -82,7 +81,7 @@ def parse_array(value: Column, encoding: str) -> Column:
         items = F.split(cleaned, _CTRL_B_SEPARATOR)
     else:
         raise ValueError(f"Unknown array encoding: {encoding!r}")
-    kept = F.array_remove(items, "")
+    kept = F.array_compact(F.transform(items, clean_string))
     return F.when(F.size(kept) > 0, kept)
 
 

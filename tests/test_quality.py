@@ -7,6 +7,7 @@ from pyspark.sql import functions as F
 
 from imdb_project.common.schemas import TABLES
 from imdb_project.preparation import quality_checks, rules
+from imdb_project.preparation import standardize as standardization
 from imdb_project.preparation.standardize import (
     CAST_ERRORS_COLUMN,
     load_standardized,
@@ -111,7 +112,7 @@ def test_rule_ids_are_unique_per_table():
     pairs = [(rule.rule_id, rule.table) for rule in all_rules]
     assert len(pairs) == len(set(pairs))
     assert {rule.rule_id.split(":")[0] for rule in all_rules} == {
-        f"DQ{number:02d}" for number in range(1, 16)
+        f"DQ{number:02d}" for number in range(1, 17)
     }
     assert all(rule.table in TABLES for rule in all_rules)
 
@@ -213,3 +214,17 @@ def test_row_rule_conditions_handle_nulls(spark, quality_cfg):
             assert flagged == EXPECTED.get((rule.rule_id, rule.table), 0), rule.rule_id
     hal = tables["name_basics"].where(F.col("nconst") == "nm0000008").first()
     assert hal["birthYear"] is None and hal["primaryProfession"] is None
+
+
+@pytest.mark.parametrize(
+    ("encoding", "value", "expected"),
+    [
+        ("comma", " Drama,\\N, Comedy, ", ["Drama", "Comedy"]),
+        ("ctrl_b", "dvd\x02 \\N \x02 video ", ["dvd", "video"]),
+        ("json", '[" Hero ", "\\\\N", "", null, " B, C "]', ["Hero", "B, C"]),
+    ],
+)
+def test_array_items_keep_normalization_semantics(spark, encoding, value, expected):
+    df = spark.createDataFrame([(value,)], "raw string")
+    row = df.select(standardization.parse_array(F.col("raw"), encoding).alias("items")).first()
+    assert row.items == expected

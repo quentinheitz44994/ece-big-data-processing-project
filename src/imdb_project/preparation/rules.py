@@ -1,4 +1,4 @@
-"""Declarative data quality rules (DQ01 to DQ15).
+"""Declarative data quality rules (DQ01 to DQ16).
 
 Two kinds of rules, both evaluated on the standardised tables of
 :mod:`imdb_project.preparation.standardize`:
@@ -310,6 +310,19 @@ def _malformed_rule(table: str) -> RowRule:
     )
 
 
+def _missing_key_rule(table: str) -> RowRule:
+    keys = TABLES[table].primary_key
+    return RowRule(
+        rule_id="DQ16",
+        table=table,
+        description=f"Missing primary key component ({', '.join(keys)})",
+        condition=lambda cfg: F.greatest(
+            F.lit(False), *[F.col(column).isNull() for column in keys]
+        ),
+        quarantine=True,
+    )
+
+
 def _unknown_genre(cfg: Config) -> Column:
     known = list(quality_settings(cfg).known_genres)
     return F.exists(F.col("genres"), lambda genre: ~genre.isin(known))
@@ -432,6 +445,7 @@ def build_rules() -> list[Rule]:
             _episode_numbers,
         ),
         *[_malformed_rule(table) for table in sorted(TABLES)],
+        *[_missing_key_rule(table) for table in sorted(TABLES)],
     ]
     return sorted(rules, key=lambda rule: (rule.rule_id, rule.table))
 
