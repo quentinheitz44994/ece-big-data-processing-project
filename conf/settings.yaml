@@ -3,13 +3,17 @@
 
 spark:
   app_name: imdb-project
-  master: "local[*]"
+  # Bound native Parquet buffers as well as JVM heap use on a 16 GB host.
+  master: "local[4]"
   shuffle_partitions: 64
   adaptive_enabled: true
   session_timezone: UTC
   log_level: WARN
   # Any additional Spark SQL/runtime configuration (key: value).
-  extra_conf: {}
+  extra_conf:
+    spark.sql.files.maxPartitionBytes: 67108864
+    spark.sql.parquet.columnarReaderBatchSize: 1024
+    spark.sql.adaptive.coalescePartitions.parallelismFirst: "false"
 
 # All paths are relative to the repository root (the working directory of the jobs).
 paths:

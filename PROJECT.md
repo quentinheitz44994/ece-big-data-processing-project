@@ -42,6 +42,13 @@ then run `wsl --shutdown` and restart Docker Desktop. With less memory, lower
 `SPARK_DRIVER_MEMORY` in `.env` (the runs of the report were done with `5g` on an
 8 GB Docker VM).
 
+The current defaults use a `4g` driver heap and `spark.master: "local[4]"`.
+Using every host CPU can exhaust native memory while reading the largest IMDb
+table, even when the JVM heap fits. Read splits and Parquet vectorized batches
+are bounded in `spark.extra_conf`. Existing clones should set
+`SPARK_DRIVER_MEMORY=4g` in `.env` and recreate the Spark service only after active
+jobs have stopped. The recovery on Maxence's Windows machine uses these settings.
+
 The container user is `jovyan` (uid 1000). On a Linux host whose user has another
 uid, make the existing mounted output folders writable first:
 `chmod -R a+rwX data outputs`. Apply the same permission adjustment to `REPORT.md`
@@ -168,7 +175,7 @@ shell or file manager. Keep `data/raw/` to reuse the downloaded IMDb archives.
 | --- | --- |
 | `port is already allocated` at `docker compose up` | Another service uses 8888, 4040 or 9092: change `JUPYTER_PORT`, `SPARK_UI_PORT` or `KAFKA_EXTERNAL_PORT` in `.env`. |
 | `MissingContactError` during a collection step | `WIKIMEDIA_CONTACT_EMAIL` is empty: set it in `.env`, then `docker compose up -d` to recreate the containers. |
-| A Spark job is killed or the container exits with code 137 | Out of memory: give Docker more memory (section 2) or lower `SPARK_DRIVER_MEMORY`, then `docker compose up -d`. |
+| A Spark job is killed, exits with code 137, or reports `Cannot allocate memory` | Use the bounded `spark.master` and Parquet settings in `conf/settings.yaml`; lower `SPARK_DRIVER_MEMORY` to `4g`. Wait for active jobs to stop before recreating the Spark service with `docker compose up -d`. |
 | `No space left on device` | Spark temporary files fill the Docker disk: `docker compose restart spark` clears `/tmp`, and `docker system prune` frees unused images. |
 | `bash\r: No such file or directory` | The scripts were checked out with CRLF line endings: clone again (the repository forces LF through `.gitattributes`) or run `git checkout -- scripts`. |
 | The streaming job reports no relevant event | The producer is not running or has finished: `docker compose --profile streaming up -d producer`, check `docker compose logs producer`. |
