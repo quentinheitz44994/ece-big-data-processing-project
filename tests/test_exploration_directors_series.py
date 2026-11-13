@@ -148,6 +148,30 @@ def test_rated_series_episodes_filters(spark):
     assert [r.tconst for r in kept.collect()] == ["e1"]
 
 
+@pytest.mark.parametrize("last_votes", [None, 1])
+def test_last_season_is_not_lost_when_rating_coverage_is_missing(spark, last_votes):
+    titles = silver_df(
+        spark, "title_basics", [movie("S1", 2000, 30, ["Drama"], title_type="tvSeries")]
+    )
+    episodes = []
+    ratings = []
+    for season, score in [(1, 9.0), (2, 7.0), (3, 1.0), (4, 5.0)]:
+        for number in range(1, 11):
+            title = f"ep{season}-{number}"
+            episodes.append(episode(title, "S1", season, number))
+            if season < 4 or last_votes is not None:
+                ratings.append(rating(title, score, 100 if season < 4 else last_votes))
+    rated = q5_series_decline.rated_series_episodes(
+        silver_df(spark, "title_episode", episodes),
+        titles,
+        silver_df(spark, "title_ratings", ratings),
+        ["tvSeries"],
+        50,
+    )
+    assert {r.last_season for r in rated.select("last_season").distinct().collect()} == {4}
+    assert q5_series_decline.series_decline(rated, 3, 10, 2, "all").count() == 0
+
+
 def test_directors_and_series_end_to_end(spark, cfg):
     titles = [
         movie("tt1", 2000, 100, ["Drama"], title="The Hit"),

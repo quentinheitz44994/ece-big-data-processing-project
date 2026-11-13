@@ -129,7 +129,7 @@ WIKIPEDIA_RECORD_SCHEMA = raw_reader.envelope_schema(
 # ----------------------------------------------------------------- raw parsing
 
 
-def wikipedia_items(records: DataFrame) -> DataFrame:
+def wikipedia_items(records: DataFrame, language: str | None = None) -> DataFrame:
     """Return one row per requested page with the content returned by the API.
 
     Requested titles are followed through the ``normalized`` and ``redirects``
@@ -138,12 +138,13 @@ def wikipedia_items(records: DataFrame) -> DataFrame:
 
     Args:
         records: Cache records read with :data:`WIKIPEDIA_RECORD_SCHEMA`.
+        language: Optional language edition to select from a shared cache.
 
     Returns:
         ``imdb_id``, ``language``, ``requested_title``, ``page_title``,
         ``page_id``, ``page_missing``, ``extract``, ``canonical_url``,
         ``revision_id``, ``revision_timestamp``, ``retrieved_at``; the most recent
-        record is kept when an identifier was collected several times.
+        record per language is kept when an identifier was collected several times.
     """
 
     def present(value: Column) -> Column:
@@ -157,6 +158,8 @@ def wikipedia_items(records: DataFrame) -> DataFrame:
         target = F.get(F.filter(mapping, lambda entry: entry["from"] == title), 0)["to"]
         return F.coalesce(target, title)
 
+    if language is not None:
+        records = records.where(F.col("request.language") == language)
     prepared = records.select(
         "retrieved_at",
         F.col("request.language").alias("language"),
@@ -190,7 +193,7 @@ def wikipedia_items(records: DataFrame) -> DataFrame:
         revision["timestamp"].alias("revision_timestamp"),
         "retrieved_at",
     )
-    latest = Window.partitionBy("imdb_id").orderBy(F.col("retrieved_at").desc())
+    latest = Window.partitionBy("imdb_id", "language").orderBy(F.col("retrieved_at").desc())
     return items.withColumn("rank", F.row_number().over(latest)).where("rank = 1").drop("rank")
 
 
@@ -435,7 +438,11 @@ def _with_mapping(
         scope.join(mapped_items, id_column, "left")
         .join(mapped_links, id_column, "left")
         .join(mapped_attempts, id_column, "left")
-        .join(_page_columns(pages, id_column), id_column, "left")
+        .join(
+            _page_columns(pages.where(F.col("language") == wiki[:-4].replace("_", "-")), id_column),
+            id_column,
+            "left",
+        )
     )
     return (
         joined.withColumn("page_collected", F.coalesce("page_collected_flag", F.lit(False)))
@@ -844,7 +851,7 @@ def run(spark: SparkSession, cfg: Config) -> tuple[DataFrame, DataFrame]:
         except FileNotFoundError:
             LOGGER.warning("%s: nothing collected yet", source)
             records = spark.createDataFrame([], WIKIPEDIA_RECORD_SCHEMA)
-        return wikipedia_items(records)
+        return wikipedia_items(records, str(cfg.enrichment.wikipedia_language))
 
     films = build_films(scope_f, items, links, attempts, pages_of(SOURCE_FILM_PAGES), cfg)
     films_path = io.layer_path(cfg, "gold", "enriched_films")

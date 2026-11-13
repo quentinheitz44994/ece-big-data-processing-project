@@ -122,12 +122,19 @@ def collect_films(
     url = api_url(cfg, language)
     for index, (imdb_id, title) in enumerate(items, start=1):
         params = film_page_params(title)
+        key = f"{language}_{imdb_id}"
+        request = {"language": language, "items": [{"imdb_id": imdb_id, "title": title}]}
+        # Reuse matching legacy entries without sharing responses across languages.
+        if not refresh and not cache.has(SOURCE_FILM_PAGES, key):
+            legacy = cache.load(SOURCE_FILM_PAGES, imdb_id)
+            if legacy is not None and legacy.get("request") == request:
+                cache.store(SOURCE_FILM_PAGES, key, legacy)
         fetch_cached(
             client,
             cache,
             SOURCE_FILM_PAGES,
-            imdb_id,
-            {"language": language, "items": [{"imdb_id": imdb_id, "title": title}]},
+            key,
+            request,
             lambda params=params: query_all(client, url, params),
             refresh=refresh,
         )

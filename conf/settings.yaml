@@ -200,7 +200,7 @@ exploration:
     min_career_years: 20
     min_films: 15
     # The best-rated film must fall within this first share of the career.
-    early_fraction: 0.3333
+    early_fraction: {numerator: 1, denominator: 3}
     # Number of best-rated films averaged in top_k_mean_position.
     top_k: 3
     max_md_rows: 50
@@ -265,6 +265,8 @@ wikimedia:
   backoff_base_seconds: 2.0
   backoff_max_seconds: 120
   retry_statuses: [429, 500, 502, 503, 504]
+  # MediaWiki can report these temporary errors inside an HTTP 200 response.
+  retry_api_errors: [maxlag, ratelimited, readonly]
   robots:
     # robots.txt of every host is read and its verdict is recorded in the
     # collection statistics. Wikimedia's robots.txt targets crawlers and
@@ -296,6 +298,8 @@ streaming:
     change_types: [edit, new]
     namespaces: [0]
     reconnect_delay_seconds: 5
+    queue_poll_seconds: 0.1
+    flush_timeout_seconds: 30
     stats_path: data/streaming/producer_stats.json
 
   # Static lookup of Wikipedia pages linked to IMDb identifiers (build_lookup.py).

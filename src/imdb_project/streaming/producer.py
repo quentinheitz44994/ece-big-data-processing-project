@@ -55,6 +55,7 @@ class ProducerStats:
     filtered_out: int = 0
     invalid: int = 0
     delivery_errors: int = 0
+    undelivered: int = 0
     reconnects: int = 0
     robots: dict[str, str] = field(default_factory=dict)
 
@@ -152,30 +153,15 @@ def run(
     namespaces = {int(value) for value in settings.namespaces}
     minutes = float(settings.duration_minutes if duration_minutes is None else duration_minutes)
     reconnect_delay = float(settings.get("reconnect_delay_seconds", 5))
+    queue_poll_seconds = float(settings.get("queue_poll_seconds", 0.1))
+    flush_timeout_seconds = float(settings.get("flush_timeout_seconds", 30))
+    if queue_poll_seconds <= 0 or flush_timeout_seconds < 0:
+        raise ValueError(
+            "queue_poll_seconds must be positive and flush_timeout_seconds nonnegative"
+        )
 
     stats = ProducerStats()
     client = WikimediaClient(cfg.wikimedia, session=http_session)
-    client.check_robots(url)  # raises with the "enforce" policy
-    stats.robots = dict(client.stats.robots)
-
-    if kafka_producer is None:
-        from confluent_kafka import Producer
-
-        ensure_topic(
-            str(cfg.kafka.bootstrap_servers),
-            topic,
-            int(cfg.kafka.get("num_partitions", 1)),
-            int(cfg.kafka.get("replication_factor", 1)),
-            float(cfg.kafka.get("startup_timeout_seconds", 90)),
-        )
-        kafka_producer = Producer(
-            {
-                "bootstrap.servers": str(cfg.kafka.bootstrap_servers),
-                "client.id": socket.gethostname(),
-                "compression.type": "lz4",
-                "linger.ms": 100,
-            }
-        )
 
     def on_delivery(error: Any, _message: Any) -> None:
         if error is not None:
@@ -189,58 +175,103 @@ def run(
     def finished() -> bool:
         return stop.requested or (deadline is not None and time.monotonic() >= deadline)
 
-    LOGGER.info("producing %s to topic %s for %s minute(s), wikis=%s", url, topic, minutes, wikis)
-    while not finished():
-        headers = {"Accept": "text/event-stream"}
-        if last_event_id:
-            headers["Last-Event-ID"] = last_event_id
-        try:
-            with client.session.get(
-                url, headers=headers, stream=True, timeout=(10, 60)
-            ) as response:
-                response.raise_for_status()
-                for event in iter_sse_events(response.iter_lines()):
-                    if event.id:
-                        last_event_id = event.id
-                    if event.event == "message" and event.data:
-                        try:
-                            change = json.loads(event.data)
-                        except ValueError:
-                            stats.invalid += 1
-                            change = None
-                        if change is not None:
-                            stats.received += 1
-                            if keep_event(change, wikis, types, namespaces):
-                                kafka_producer.produce(
-                                    topic,
-                                    key=str(change["meta"]["id"]).encode("utf-8"),
-                                    value=event.data.encode("utf-8"),
-                                    on_delivery=on_delivery,
-                                )
-                                kafka_producer.poll(0)
-                                stats.produced += 1
-                            else:
-                                stats.filtered_out += 1
-                    if time.monotonic() - last_log >= 60:
-                        last_log = time.monotonic()
-                        LOGGER.info("received=%d produced=%d", stats.received, stats.produced)
-                    if finished():
-                        break
-        except requests.RequestException as exc:
-            if finished():
-                break
-            stats.reconnects += 1
-            LOGGER.warning("stream interrupted (%s), reconnecting in %ss", exc, reconnect_delay)
-            time.sleep(reconnect_delay)
+    try:
+        client.check_robots(url)  # raises with the "enforce" policy
+        stats.robots = dict(client.stats.robots)
+        if kafka_producer is None:
+            from confluent_kafka import Producer
 
-    kafka_producer.flush(30)
-    stats.finished_at = utc_now()
-    LOGGER.info("producer finished: %s", asdict(stats))
-    stats_path = settings.get("stats_path")
-    if stats_path:
-        path = Path(str(stats_path))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(asdict(stats)) + "\n", encoding="utf-8")
+            ensure_topic(
+                str(cfg.kafka.bootstrap_servers),
+                topic,
+                int(cfg.kafka.get("num_partitions", 1)),
+                int(cfg.kafka.get("replication_factor", 1)),
+                float(cfg.kafka.get("startup_timeout_seconds", 90)),
+            )
+            kafka_producer = Producer(
+                {
+                    "bootstrap.servers": str(cfg.kafka.bootstrap_servers),
+                    "client.id": socket.gethostname(),
+                    "compression.type": "lz4",
+                    "linger.ms": 100,
+                }
+            )
+
+        LOGGER.info(
+            "producing %s to topic %s for %s minute(s), wikis=%s", url, topic, minutes, wikis
+        )
+        while not finished():
+            headers = {"Accept": "text/event-stream"}
+            if last_event_id:
+                headers["Last-Event-ID"] = last_event_id
+            try:
+                with client.session.get(
+                    url, headers=headers, stream=True, timeout=(10, 60)
+                ) as response:
+                    response.raise_for_status()
+                    for event in iter_sse_events(response.iter_lines()):
+                        if event.event == "message" and event.data:
+                            try:
+                                change = json.loads(event.data)
+                            except ValueError:
+                                stats.invalid += 1
+                                change = None
+                            if change is not None:
+                                stats.received += 1
+                                if keep_event(change, wikis, types, namespaces):
+                                    queued = False
+                                    while not finished():
+                                        try:
+                                            kafka_producer.produce(
+                                                topic,
+                                                key=str(change["meta"]["id"]).encode("utf-8"),
+                                                value=event.data.encode("utf-8"),
+                                                on_delivery=on_delivery,
+                                            )
+                                        except BufferError:
+                                            kafka_producer.poll(queue_poll_seconds)
+                                        else:
+                                            queued = True
+                                            stats.produced += 1
+                                            kafka_producer.poll(0)
+                                            break
+                                    if not queued:
+                                        break  # keep the last successfully handled SSE offset
+                                else:
+                                    stats.filtered_out += 1
+                        if event.id:
+                            last_event_id = event.id
+                        if time.monotonic() - last_log >= 60:
+                            last_log = time.monotonic()
+                            LOGGER.info("received=%d produced=%d", stats.received, stats.produced)
+                        if finished():
+                            break
+            except requests.RequestException as exc:
+                if finished():
+                    break
+                stats.reconnects += 1
+                LOGGER.warning("stream interrupted (%s), reconnecting in %ss", exc, reconnect_delay)
+                time.sleep(reconnect_delay)
+    finally:
+        try:
+            if kafka_producer is not None:
+                stats.undelivered = kafka_producer.flush(flush_timeout_seconds) or 0
+        finally:
+            stats.finished_at = utc_now()
+            LOGGER.info("producer finished: %s", asdict(stats))
+            try:
+                stats_path = settings.get("stats_path")
+                if stats_path:
+                    path = Path(str(stats_path))
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(json.dumps(asdict(stats)) + "\n", encoding="utf-8")
+            finally:
+                client.close()
+    if stats.undelivered or stats.delivery_errors:
+        raise RuntimeError(
+            f"Kafka delivery failed: {stats.undelivered} undelivered, "
+            f"{stats.delivery_errors} delivery errors"
+        )
     return stats
 
 

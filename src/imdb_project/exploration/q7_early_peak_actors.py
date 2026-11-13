@@ -18,6 +18,9 @@ the ``top_k`` best-rated films (0 = first year, 1 = last year).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from fractions import Fraction
+
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
@@ -27,6 +30,19 @@ from imdb_project.exploration import base
 
 LOGGER = get_logger(__name__)
 NAME = "q7_early_peak_actors"
+
+
+def career_fraction(cfg: Config) -> float:
+    """Resolve the early-career fraction without rounding a configured ratio."""
+    value = base.question_setting(cfg, "q7", "early_fraction", 1 / 3)
+    fraction = (
+        float(Fraction(value["numerator"], value["denominator"]))
+        if isinstance(value, Mapping)
+        else float(value)
+    )
+    if not 0 < fraction <= 1:
+        raise ValueError("early_fraction must be in (0, 1]")
+    return fraction
 
 
 def actor_filmography(principals: DataFrame, films: DataFrame, categories: list[str]) -> DataFrame:
@@ -145,7 +161,7 @@ def run(spark: SparkSession, cfg: Config) -> DataFrame:
     categories = list(base.question_setting(cfg, "q7", "categories", ["actor", "actress"]))
     min_career = int(base.question_setting(cfg, "q7", "min_career_years", 20))
     min_films = int(base.question_setting(cfg, "q7", "min_films", 15))
-    early_fraction = float(base.question_setting(cfg, "q7", "early_fraction", 1 / 3))
+    early_fraction = career_fraction(cfg)
     top_k = int(base.question_setting(cfg, "q7", "top_k", 3))
     min_votes = int(base.question_setting(cfg, "q7", "min_votes", 0))
     max_rows = int(base.question_setting(cfg, "q7", "max_md_rows", 50))

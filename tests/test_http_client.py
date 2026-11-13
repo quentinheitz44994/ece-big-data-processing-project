@@ -14,6 +14,40 @@ SPARQL = "https://query.wikidata.org/sparql"
 WIKIPEDIA_ROBOTS = "User-agent: *\nAllow: /w/api.php?action=mobileview&\nDisallow: /w/\n"
 
 
+def test_api_errors_never_become_successful_cache_entries(cfg, tmp_path):
+    client, session, clock = make_client(cfg, max_retries=1)
+    cache = http_client.RawCache(tmp_path)
+    session.script(
+        API,
+        FakeResponse({"error": {"code": "ratelimited"}}, headers={"Retry-After": "9"}),
+        FakeResponse({"error": {"code": "ratelimited"}}),
+    )
+    with pytest.raises(RuntimeError, match="ratelimited"):
+        http_client.fetch_cached(
+            client, cache, "pages", "film", {}, lambda: [client.request_json(API, {})]
+        )
+    assert not cache.has("pages", "film") and 9.0 in clock.sleeps
+    session.script(API, FakeResponse({"error": {"code": "permissiondenied"}}))
+    with pytest.raises(RuntimeError, match="permissiondenied"):
+        client.request_json(API, {})
+
+
+def test_retryable_api_error_and_legacy_failed_cache_are_recovered(cfg, tmp_path):
+    client, session, _ = make_client(cfg)
+    cache = http_client.RawCache(tmp_path)
+    cache.store("pages", "film", {"responses": [{"error": {"code": "ratelimited"}}]})
+    session.script(
+        API,
+        FakeResponse({"error": {"code": "readonly"}}),
+        FakeResponse({"query": {"pages": []}}),
+    )
+    result = http_client.fetch_cached(
+        client, cache, "pages", "film", {}, lambda: [client.request_json(API, {})]
+    )
+    assert result["responses"] == [{"query": {"pages": []}}]
+    assert len(session.calls) == 2 and client.stats.retries == 1
+
+
 def test_user_agent_requires_a_contact(cfg):
     with pytest.raises(http_client.MissingContactError, match="WIKIMEDIA_CONTACT_EMAIL"):
         http_client.build_user_agent(cfg.with_overrides({"wikimedia.contact": ""}).wikimedia)

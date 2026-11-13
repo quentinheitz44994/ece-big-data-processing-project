@@ -8,7 +8,8 @@ import pytest
 from fakes import FakeResponse, FakeSession, make_client
 from helpers import movie, person, principal, rating, silver_df, write_silver
 from imdb_project.common import io
-from imdb_project.enrichment import build_enrichment, fetch_wikipedia, select_scope
+from imdb_project.enrichment import build_enrichment, fetch_wikipedia, raw_reader, select_scope
+from imdb_project.enrichment.http_client import RawCache
 
 SPARQL = "https://query.wikidata.org/sparql"
 API = "https://en.wikipedia.org/w/api.php"
@@ -17,6 +18,36 @@ ROBOTS = {
     "en.wikipedia.org": "User-agent: *\nDisallow: /w/\n",
     "query.wikidata.org": "User-agent: *\nDisallow: /sparql\n",
 }
+
+
+def test_film_cache_and_page_selection_are_scoped_to_language(spark, cfg):
+    client, session, _ = make_client(cfg)
+    cache = RawCache(io.layer_path(cfg, "enrichment", "raw"))
+    french_api = API.replace("en.wikipedia", "fr.wikipedia")
+    for api, title in [(API, "English film"), (french_api, "French film")]:
+        session.script(
+            api,
+            FakeResponse({"query": {"pages": [{"title": title, "extract": title}]}}),
+        )
+    fetch_wikipedia.collect_films(cfg, [("tt0000001", "English film")], client, cache)
+    french = cfg.with_overrides({"enrichment.wikipedia_language": "fr"})
+    fetch_wikipedia.collect_films(french, [("tt0000001", "French film")], client, cache)
+    fetch_wikipedia.collect_films(cfg, [("tt0000001", "English film")], client, cache)
+    assert len(session.calls) == 2
+    records = raw_reader.read_raw_records(
+        spark, cfg, fetch_wikipedia.SOURCE_FILM_PAGES, build_enrichment.WIKIPEDIA_RECORD_SCHEMA
+    )
+    try:
+        both = build_enrichment.wikipedia_items(records).collect()
+        assert {(r.language, r.extract) for r in both} == {
+            ("en", "English film"),
+            ("fr", "French film"),
+        }
+        (page,) = build_enrichment.wikipedia_items(records, "fr").collect()
+        assert page.language == "fr" and page.extract == "French film"
+    finally:
+        records.unpersist()
+
 
 LONG_PLOT = "A retired sailor returns to the harbour town of his youth. " * 6
 

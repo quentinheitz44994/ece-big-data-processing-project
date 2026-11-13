@@ -73,6 +73,7 @@ class _StreamResponse:
 class _StreamSession:
     def __init__(self, lines):
         self.headers, self.requests, self._lines = {}, [], lines
+        self.closed = False
 
     def get(self, url, **kwargs):
         if url.endswith("/robots.txt"):
@@ -84,7 +85,106 @@ class _StreamSession:
         return _StreamResponse(lines)
 
     def close(self):
-        pass
+        self.closed = True
+
+
+def _one_event_session():
+    event = change("id-1", "Alpha (film)", "2026-11-10T12:00:00Z")
+    return _StreamSession(["id: offset-1", "data: " + json.dumps(event), ""])
+
+
+def test_producer_retries_the_same_event_when_the_queue_is_full(cfg):
+    stop = producer.StopFlag()
+
+    class SaturatedProducer(FakeKafkaProducer):
+        attempts = 0
+
+        def produce(self, *args, **kwargs):
+            self.attempts += 1
+            if self.attempts <= 2:
+                raise BufferError("Local: Queue full")
+            super().produce(*args, **kwargs)
+
+        def poll(self, timeout):
+            if timeout == 0:
+                stop.request()
+
+    kafka, session = SaturatedProducer(), _one_event_session()
+    stats = producer.run(
+        cfg.with_overrides({"wikimedia.contact": "tests@example.org"}),
+        duration_minutes=0,
+        kafka_producer=kafka,
+        http_session=session,
+        stop=stop,
+    )
+    assert kafka.attempts == 3 and len(kafka.messages) == stats.produced == 1
+    assert kafka.messages[0][1] == b"id-1"
+    assert kafka.flushed and session.closed
+
+
+def test_producer_can_stop_while_its_queue_remains_full(cfg):
+    stop = producer.StopFlag()
+
+    class BlockedProducer(FakeKafkaProducer):
+        def produce(self, *args, **kwargs):
+            raise BufferError("Local: Queue full")
+
+        def poll(self, timeout):
+            stop.request()
+
+    kafka, session = BlockedProducer(), _one_event_session()
+    stats = producer.run(
+        cfg.with_overrides({"wikimedia.contact": "tests@example.org"}),
+        duration_minutes=0,
+        kafka_producer=kafka,
+        http_session=session,
+        stop=stop,
+    )
+    assert stats.produced == 0 and kafka.flushed and session.closed
+
+
+def test_producer_flushes_and_records_stats_after_an_unexpected_error(cfg, tmp_path):
+    class BrokenProducer(FakeKafkaProducer):
+        def produce(self, *args, **kwargs):
+            raise RuntimeError("Unexpected Kafka failure")
+
+    kafka, session = BrokenProducer(), _one_event_session()
+    stats_path = tmp_path / "producer.json"
+    configured = cfg.with_overrides(
+        {
+            "wikimedia.contact": "tests@example.org",
+            "streaming.producer.stats_path": str(stats_path),
+        }
+    )
+    with pytest.raises(RuntimeError, match="Unexpected Kafka failure"):
+        producer.run(configured, 0, kafka_producer=kafka, http_session=session)
+    assert kafka.flushed and session.closed
+    assert json.loads(stats_path.read_text())["finished_at"] is not None
+
+
+def test_producer_reports_records_left_after_flush(cfg, tmp_path):
+    stop = producer.StopFlag()
+
+    class UndeliveredProducer(FakeKafkaProducer):
+        def poll(self, timeout):
+            stop.request()
+
+        def flush(self, timeout):
+            self.flushed = True
+            return 2
+
+    kafka, session = UndeliveredProducer(), _one_event_session()
+    stats_path = tmp_path / "producer.json"
+    configured = cfg.with_overrides(
+        {
+            "wikimedia.contact": "tests@example.org",
+            "streaming.producer.stats_path": str(stats_path),
+        }
+    )
+    with pytest.raises(RuntimeError, match="2 undelivered"):
+        producer.run(configured, 0, kafka_producer=kafka, http_session=session, stop=stop)
+    assert json.loads(stats_path.read_text())["undelivered"] == 2
+    assert kafka.flushed and session.closed
 
 
 def test_producer_publishes_raw_json_keyed_by_event_id(cfg, tmp_path):
