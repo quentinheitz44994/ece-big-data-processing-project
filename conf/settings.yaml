@@ -265,6 +265,8 @@ wikimedia:
   backoff_base_seconds: 2.0
   backoff_max_seconds: 120
   retry_statuses: [429, 500, 502, 503, 504]
+  # MediaWiki can report these temporary errors inside an HTTP 200 response.
+  retry_api_errors: [maxlag, ratelimited, readonly]
   robots:
     # robots.txt of every host is read and its verdict is recorded in the
     # collection statistics. Wikimedia's robots.txt targets crawlers and

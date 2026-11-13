@@ -154,6 +154,9 @@ class WikimediaClient:
         self.retry_statuses = {
             int(s) for s in wikimedia.get("retry_statuses", [429, 500, 502, 503, 504])
         }
+        self.retry_api_errors = set(
+            wikimedia.get("retry_api_errors", ["maxlag", "ratelimited", "readonly"])
+        )
         self.robots_policy = str(wikimedia.get("robots.policy", ROBOTS_REPORT))
         if self.robots_policy not in (ROBOTS_REPORT, ROBOTS_ENFORCE):
             raise ValueError(f"Unknown robots policy: {self.robots_policy!r}")
@@ -317,11 +320,20 @@ class WikimediaClient:
                 last_error = f"invalid JSON: {exc}"
                 self._wait(self._backoff(attempt, retry_after))
                 continue
-            error = document.get("error") if isinstance(document, dict) else None
-            if use_maxlag and isinstance(error, dict) and error.get("code") == "maxlag":
-                self.stats.maxlag_waits += 1
-                last_error = "maxlag"
-                self._wait(self._backoff(attempt, retry_after or float(self.maxlag_seconds)))
+            if not isinstance(document, dict):
+                self.stats.failed += 1
+                raise RuntimeError(f"Expected a JSON object from {url}")
+            error = document.get("error")
+            if error:
+                code = str(error.get("code", "unknown")) if isinstance(error, dict) else "unknown"
+                if code not in self.retry_api_errors:
+                    self.stats.failed += 1
+                    raise RuntimeError(f"API error {code} for {url}: {error}")
+                if code == "maxlag":
+                    self.stats.maxlag_waits += 1
+                    retry_after = retry_after or float(self.maxlag_seconds)
+                last_error = f"API error {code}"
+                self._wait(self._backoff(attempt, retry_after))
                 continue
             return document
 
@@ -418,7 +430,10 @@ def fetch_cached(
     counters = stats or (client.stats if client else ClientStats())
     if not refresh:
         cached = cache.load(source, key)
-        if cached is not None:
+        if cached is not None and not any(
+            isinstance(response, Mapping) and response.get("error")
+            for response in cached.get("responses", [])
+        ):
             counters.cache_hits += 1
             return cached
     counters.cache_misses += 1
