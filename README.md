@@ -1,6 +1,6 @@
 # ECE Big Data Processing project (fall 2026)
 
-- Group: gr-XX
+- Group: gr-3
 - Quentin HEITZ, quentinheitz44994
 - Maxence SIMONET, maxence808
 
