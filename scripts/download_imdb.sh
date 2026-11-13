@@ -53,6 +53,10 @@ declare -A STATUS
 for file in "${FILES[@]}"; do
   target="${RAW_DIR}/${file}"
   if [[ -s "${target}" && "${FORCE}" -eq 0 ]]; then
+    if ! gzip --test "${target}"; then
+      echo "Invalid existing archive: ${target}. Run again with --force." >&2
+      exit 1
+    fi
     log "skip ${file} (already present, use --force to download again)"
     STATUS["${file}"]="already present"
     continue
