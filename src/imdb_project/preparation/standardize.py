@@ -9,6 +9,10 @@ exactly the same typed values:
 * multi-valued columns encoded as text become ``array<string>``.
 
 Nothing is imputed: a value is either kept, converted or set to null.
+
+Only native string functions are used (no regular expression on scalar values, no
+lambda): these expressions run on every column of every row of tables holding up
+to a hundred million rows.
 """
 
 from __future__ import annotations
@@ -32,27 +36,28 @@ from imdb_project.common.schemas import (
 IMDB_NULL_MARKER = "\\N"
 #: Technical column listing the columns of a row whose value could not be converted.
 CAST_ERRORS_COLUMN = "_cast_errors"
-
-_ARRAY_SEPARATORS = {ARRAY_COMMA: ",", ARRAY_CTRL_B: "\u0002"}
-#: Characters treated like spaces when testing for a blank value: non-breaking
-#: space (U+00A0) and tab. Ordinary spaces are handled by ``trim``.
-_EXTRA_SPACES = chr(0xA0) + chr(0x09)
-
-
-def is_missing(value: Column) -> Column:
-    r"""Return whether a raw string is null, ``\N``, empty or whitespace-only.
-
-    Implemented with ``translate`` and ``trim`` rather than a regular expression:
-    the predicate runs on every column of every row of tables holding up to a
-    hundred million rows.
-    """
-    blank = F.trim(F.translate(value, _EXTRA_SPACES, "  ")) == ""
-    return value.isNull() | (value == IMDB_NULL_MARKER) | blank
+#: Characters trimmed from both ends of every value: space, tab and
+#: non-breaking space (U+00A0).
+TRIM_CHARACTERS = " " + chr(0x09) + chr(0xA0)
+#: Comma separator of multi-valued columns, with optional surrounding spaces.
+_COMMA_SEPARATOR = " *, *"
+#: Control character (0x02) separating the values of some akas columns.
+_CTRL_B_SEPARATOR = chr(0x02)
 
 
 def clean_string(value: Column) -> Column:
-    """Return the trimmed string, or null when the raw value is missing."""
-    return F.when(~is_missing(value), F.trim(value))
+    r"""Return the trimmed string, or null when the raw value is missing.
+
+    A value is missing when it is null, empty, made of whitespace only or equal
+    to the IMDb marker ``\N``.
+    """
+    trimmed = F.btrim(value, F.lit(TRIM_CHARACTERS))
+    return F.when((trimmed != "") & (trimmed != IMDB_NULL_MARKER), trimmed)
+
+
+def is_missing(value: Column) -> Column:
+    r"""Return whether a raw string is null, ``\N``, empty or whitespace-only."""
+    return clean_string(value).isNull()
 
 
 def parse_array(value: Column, encoding: str) -> Column:
@@ -63,17 +68,21 @@ def parse_array(value: Column, encoding: str) -> Column:
         encoding: One of the ``ARRAY_*`` encodings of :mod:`imdb_project.common.schemas`.
 
     Returns:
-        The array of trimmed, non-empty items, or null when there is none.
+        The array of non-empty items, or null when there is none.
+
+    Raises:
+        ValueError: If the encoding is unknown.
     """
     cleaned = clean_string(value)
     if encoding == ARRAY_JSON:
-        items = F.from_json(cleaned, "array<string>")
+        items = F.array_compact(F.from_json(cleaned, "array<string>"))
+    elif encoding == ARRAY_COMMA:
+        items = F.split(cleaned, _COMMA_SEPARATOR)
+    elif encoding == ARRAY_CTRL_B:
+        items = F.split(cleaned, _CTRL_B_SEPARATOR)
     else:
-        items = F.split(cleaned, _ARRAY_SEPARATORS[encoding])
-    kept = F.filter(
-        F.transform(items, lambda item: F.trim(item)),
-        lambda item: item.isNotNull() & (item != "") & (item != IMDB_NULL_MARKER),
-    )
+        raise ValueError(f"Unknown array encoding: {encoding!r}")
+    kept = F.array_remove(items, "")
     return F.when(F.size(kept) > 0, kept)
 
 
@@ -91,11 +100,12 @@ def typed_column(spec: TableSpec, column: str) -> Column:
     return value
 
 
-def _is_missing_raw(spec: TableSpec, column: str) -> Column:
-    raw = F.col(column)
-    if column in spec.arrays:
-        return is_missing(raw) | (F.trim(raw) == "[]")
-    return is_missing(raw)
+def _has_value(spec: TableSpec, column: str) -> Column:
+    """Whether the raw column holds something to convert (``[]`` is an empty array)."""
+    cleaned = clean_string(F.col(column))
+    if spec.arrays.get(column) == ARRAY_JSON:
+        return cleaned.isNotNull() & (cleaned != "[]")
+    return cleaned.isNotNull()
 
 
 def standardize_table(df: DataFrame, spec: TableSpec) -> DataFrame:
@@ -110,23 +120,36 @@ def standardize_table(df: DataFrame, spec: TableSpec) -> DataFrame:
         (``array<string>``: columns holding a value that could not be converted)
         and ``_corrupt_record``.
     """
-    converted = [column for column in spec.columns if column in spec.casts or column in spec.arrays]
-    failures = [
-        F.when(~_is_missing_raw(spec, column) & typed_column(spec, column).isNull(), F.lit(column))
-        for column in converted
+    # Conversions that can fail: scalar casts and JSON arrays. Splitting a
+    # separated list always succeeds.
+    fallible = [
+        column
+        for column in spec.columns
+        if column in spec.casts or spec.arrays.get(column) == ARRAY_JSON
     ]
-    cast_errors = (
-        F.array_compact(F.array(*failures)) if failures else F.array().cast("array<string>")
-    )
     corrupt = (
         F.col(CORRUPT_RECORD_COLUMN)
         if CORRUPT_RECORD_COLUMN in df.columns
         else F.lit(None).cast("string")
     )
-    return df.select(
+    # Two projections so that each conversion is evaluated once: the first one
+    # converts and records which raw values were present, the second one compares.
+    converted = df.select(
         *[typed_column(spec, column).alias(column) for column in spec.columns],
-        cast_errors.alias(CAST_ERRORS_COLUMN),
+        *[_has_value(spec, column).alias(f"__has_{column}") for column in fallible],
         corrupt.alias(CORRUPT_RECORD_COLUMN),
+    )
+    failures = [
+        F.when(F.col(f"__has_{column}") & F.col(column).isNull(), F.lit(column))
+        for column in fallible
+    ]
+    cast_errors = (
+        F.array_compact(F.array(*failures)) if failures else F.array().cast("array<string>")
+    )
+    return converted.select(
+        *spec.columns,
+        cast_errors.alias(CAST_ERRORS_COLUMN),
+        CORRUPT_RECORD_COLUMN,
     )
 
 
