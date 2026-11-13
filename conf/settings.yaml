@@ -1,0 +1,31 @@
+# Single source of truth for every parameter of the project (no hard-coded
+# thresholds in the code). String values support ${ENV_VAR:-default} expansion.
+
+spark:
+  app_name: imdb-project
+  master: "local[*]"
+  shuffle_partitions: 64
+  adaptive_enabled: true
+  session_timezone: UTC
+  log_level: WARN
+  # Any additional Spark SQL/runtime configuration (key: value).
+  extra_conf: {}
+
+# All paths are relative to the repository root (the working directory of the jobs).
+paths:
+  raw: data/raw
+  bronze: data/bronze
+  silver: data/silver
+  quarantine: data/quarantine
+  gold: data/gold
+  enrichment: data/enrichment
+  streaming: data/streaming
+  outputs: outputs
+
+kafka:
+  bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:19092}
+  topic: wikistreams
+  num_partitions: 1
+  replication_factor: 1
+  # Seconds to wait for the broker when creating the topic.
+  startup_timeout_seconds: 90

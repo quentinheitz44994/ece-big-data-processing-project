@@ -1,0 +1,65 @@
+# Local environment: Kafka (KRaft, single node) + Spark (PySpark, Jupyter).
+# Derived from the course lab 05 (05.structured-streaming/lab_docker_wikistreams).
+name: imdb-project
+
+services:
+  kafka:
+    image: apache/kafka-native:4.1.1
+    ports:
+      - "${KAFKA_EXTERNAL_PORT:-9092}:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:19092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - kafka-spark-net
+
+  # One-shot service: creates the Kafka topic (idempotent) and exits.
+  kafka-init:
+    build:
+      context: .
+      dockerfile: docker/producer/Dockerfile
+    command: ["python", "-m", "imdb_project.streaming.admin"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    volumes:
+      - ./src:/app/src:ro
+      - ./conf:/app/conf:ro
+    networks:
+      - kafka-spark-net
+    depends_on:
+      - kafka
+    restart: "no"
+
+  spark:
+    build:
+      context: .
+      dockerfile: docker/spark/Dockerfile
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+      - "${SPARK_UI_PORT:-4040}:4040"
+      - "4041:4041"
+    environment:
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-6g}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      WIKIMEDIA_CONTACT_EMAIL: ${WIKIMEDIA_CONTACT_EMAIL:-}
+    volumes:
+      # The whole repository (src, conf, scripts, data, outputs, notebooks, tests).
+      - .:/home/jovyan/project
+    working_dir: /home/jovyan/project
+    networks:
+      - kafka-spark-net
+    depends_on:
+      - kafka
+
+networks:
+  kafka-spark-net:
+    driver: bridge

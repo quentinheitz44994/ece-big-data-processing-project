@@ -1,0 +1,30 @@
+# Data is never committed (IMDb files are under a non-commercial licence and are
+# downloaded by scripts/download_imdb.sh). Only the README of the folder is kept.
+data/*
+!data/README.md
+
+# Local configuration and secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+
+# Spark / Jupyter
+spark-warehouse/
+metastore_db/
+derby.log
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/
