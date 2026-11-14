@@ -333,3 +333,58 @@ kafka:
   replication_factor: 1
   # Seconds to wait for the broker when creating the topic.
   startup_timeout_seconds: 90
+
+# ---------------------------------------------------------------- report assembly
+report:
+  path: REPORT.md
+  # Source paths are relative to paths.outputs. Offsets nest generated headings
+  # below each Results heading. Missing sources fail before any report write.
+  blocks:
+    preparation:
+      heading_offset: 3
+      files:
+        - data_snapshot.md
+        - preparation/ingestion_summary.md
+        - preparation/null_profile.md
+        - preparation/top5_null_columns.md
+        - preparation/quality_report.md
+        - preparation/quality_samples.md
+        - preparation/cleaning_summary.md
+    q1:
+      heading_offset: 4
+      files: [exploration/q1_runtime_outliers.md]
+    q2:
+      heading_offset: 4
+      files: [exploration/q2_top_genres.md]
+    q3:
+      heading_offset: 4
+      files: [exploration/q3_top_vs_rest.md]
+    q4:
+      heading_offset: 4
+      files: [exploration/q4_one_hit_directors.md]
+    q5:
+      heading_offset: 4
+      files: [exploration/q5_series_decline.md]
+    q6:
+      heading_offset: 4
+      files: [exploration/q6_multilingual_actors.md]
+    q7:
+      heading_offset: 4
+      files: [exploration/q7_early_peak_actors.md]
+    q8:
+      heading_offset: 4
+      files: [exploration/q8_multi_talented.md]
+    enrichment:
+      heading_offset: 3
+      files:
+        - enrichment/scope.md
+        - enrichment/coverage.md
+        - enrichment/collection_stats.md
+        - enrichment/sample.md
+    streaming:
+      heading_offset: 3
+      files: [streaming/lookup.md, streaming/summary.md]
+    open_question:
+      heading_offset: 3
+      # Planned interface: the question is still to be chosen by the authors.
+      files: [open_question/summary.md]

@@ -13,7 +13,7 @@ Apache Kafka. Course: ECE Paris, Big Data Processing, fall 2026.
 | Quentin HEITZ | quentinheitz44994 | EMAIL_TO_COMPLETE |
 | Maxence SIMONET | maxence808 | maxence.simonet@outlook.com |
 
-Group: gr-XX
+Group: gr-3
 
 ## 2. Prerequisites
 
@@ -88,17 +88,16 @@ and not needed to reproduce the report.
 | 5a. Start the producer | `docker compose --profile streaming up -d producer` | a few seconds | events in the Kafka topic `wikistreams` |
 | 5b. Streaming job (pending implementation) | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | planned: `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
 | 6. Open question (pending author choice and implementation) | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | planned: `data/gold/open_question/`, `outputs/open_question/` |
-| 7. Render the report (pending implementation) | `docker compose exec spark python scripts/render_report.py` | not measured | planned: generated tables injected in `REPORT.md` |
+| 7. Render the report | `docker compose exec spark python scripts/render_report.py` | not measured | generated tables injected in `REPORT.md` |
 
 (*) Measured on a 12-core laptop, Docker VM with 8 GB, `SPARK_DRIVER_MEMORY=5g`,
 repository on the Windows drive.
 
 Notes per step:
 
-Steps 5b, 6 and 7 describe the planned interface. Their scripts and `REPORT.md` are
-not delivered by PRs #1–#13 or the review-fix branch. Run those steps only after
-the corresponding implementations have landed and been tested. `DURATION_*`
-fields are placeholders, not measurements from Maxence's installation.
+Run a pipeline step only after its implementation has landed and been tested.
+Steps still marked as pending describe their planned interface. `DURATION_*`
+fields are placeholders until replaced with measured execution times.
 
 1. **Download.** Existing files are checked with `gzip --test` before being
    skipped (`--force` downloads again). An invalid existing archive fails the step
@@ -130,6 +129,7 @@ fields are placeholders, not measurements from Maxence's installation.
 7. **Report.** `render_report.py` only replaces the blocks between `AUTO` markers
    of `REPORT.md`; the text written by the authors is never touched.
    `python scripts/render_report.py --check` tells whether the report is up to date.
+   Use `--block preparation` to update only available results; see section 8.
 
 ### 3.3 Stop and clean
 
@@ -227,7 +227,7 @@ is collected.
 
 | Tool | Model | Tasks that relied on it |
 | --- | --- | --- |
-| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. The Structured Streaming job, open question implementation and report renderer remain pending. |
+| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. |
 | Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
 
 - The brief given to the tool is versioned in [CLAUDE.md](CLAUDE.md): it fixes the
@@ -242,3 +242,45 @@ is collected.
   `REPORT.md`** (methodological explanations, alternatives and trade-offs, key
   takeaways, description of the open question): these parts are written by the
   authors.
+
+### Report session declaration
+
+| Tool | Model | Tasks that relied on it |
+| --- | --- | --- |
+| Codex (OpenAI), in the report session driven by Maxence SIMONET | GPT-6 | Creation of the `REPORT.md` heading/marker skeleton and author placeholders; implementation and tests of the configured, atomic report renderer, partial rendering and freshness checks; execution-guide updates and validation against generated preparation tables. No explanatory or methodological prose in `REPORT.md` was generated. |
+
+## 8. Report assembly
+
+`REPORT.md` is a heading/marker skeleton. Quentin and Maxence write every
+methodological explanation, motivation and takeaway themselves in the author
+placeholders. The renderer changes only the bytes between paired `AUTO` markers;
+all author text, markers and line endings outside those blocks are preserved.
+
+Source files, their order and their heading offsets are declared in
+`report.blocks` in `conf/settings.yaml`. Sources are read under `paths.outputs`.
+Generated headings are nested below the report's Results headings; fenced code
+and table cells are preserved. The planned open-question source is
+`outputs/open_question/summary.md`; update its configured path when the authors
+choose the question and its implementation is available.
+
+Once all configured results exist:
+
+```bash
+docker compose exec spark python scripts/render_report.py
+docker compose exec spark python scripts/render_report.py --check
+```
+
+During development, select only completed blocks (repeat `--block` for several):
+
+```bash
+docker compose exec spark python scripts/render_report.py --block preparation
+docker compose exec spark python scripts/render_report.py --block preparation --check
+```
+
+The default operation requires every configured source. A missing source or
+invalid, duplicate, mismatched or nested marker fails before the report is
+changed. A successful render is atomic; an unchanged report is not rewritten.
+The renderer also refuses to overwrite an author edit detected during rendering.
+`--check` never writes: exit status 0 means current, 1 means stale, and 2 means
+invalid inputs or missing results. A full check will therefore fail while
+exploration, enrichment, streaming or open-question results are still missing.
