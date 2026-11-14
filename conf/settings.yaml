@@ -448,5 +448,5 @@ report:
       files: [streaming/lookup.md, streaming/summary.md]
     open_question:
       heading_offset: 3
-      # Planned interface: the question is still to be chosen by the authors.
+      # Written by scripts/run_open_question.sh (recurring director-actor collaborations).
       files: [open_question/summary.md]

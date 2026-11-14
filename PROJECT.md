@@ -90,15 +90,19 @@ and not needed to reproduce the report.
 | --- | --- | --- | --- |
 | 1. Download IMDb files | `docker compose exec spark bash scripts/download_imdb.sh` | DURATION_DOWNLOAD | `data/raw/*.tsv.gz`, `outputs/data_snapshot.md` |
 | 2. Data preparation | `docker compose exec spark bash scripts/run_preparation.sh` | DURATION_PREPARATION | `data/bronze/`, `data/silver/`, `data/quarantine/`, `outputs/preparation/` |
-| 3. Data exploration | `docker compose exec spark bash scripts/run_exploration.sh` | DURATION_EXPLORATION | `data/gold/exploration/`, `outputs/exploration/` |
-| 4. Data enrichment | `docker compose exec spark bash scripts/run_enrichment.sh` | DURATION_ENRICHMENT | `data/enrichment/`, `data/gold/enriched_*`, `outputs/enrichment/` |
+| 3. Data exploration | `docker compose exec spark bash scripts/run_exploration.sh` | ≈ 9 min (523 s) | `data/gold/exploration/`, `outputs/exploration/` |
+| 4. Data enrichment | `docker compose exec spark bash scripts/run_enrichment.sh` | ≈ 2 h 30 (8,852 s, at most 1 request/s; resumable) | `data/enrichment/`, `data/gold/enriched_*`, `outputs/enrichment/` |
 | 5a. Start the producer | `docker compose --profile streaming up -d producer` | a few seconds | events in the Kafka topic `wikistreams` |
-| 5b. Streaming job | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
-| 6. Open question (pending author choice and implementation) | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | planned: `data/gold/open_question/`, `outputs/open_question/` |
+| 5b. Streaming job | `docker compose exec spark bash scripts/run_streaming.sh` | 20 min run, plus ≈ 17 min to build the lookup on the first run | `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
+| 6. Open question | `docker compose exec spark bash scripts/run_open_question.sh` | ≈ 1.5 min (98 s) | `data/gold/open_question/`, `outputs/open_question/` |
 | 7. Render the report | `docker compose exec spark python scripts/render_report.py` | not measured | generated tables injected in `REPORT.md` |
 
-(*) Measured on a 12-core laptop, Docker VM with 8 GB, `SPARK_DRIVER_MEMORY=5g`,
-repository on the Windows drive.
+(*) Measured by Maxence on 2026-11-14: Windows laptop, Docker Desktop VM with
+10 GB of memory and 16 visible CPUs, `SPARK_DRIVER_MEMORY=4g`,
+`spark.master: "local[4]"`, repository on the Windows drive. The download and
+preparation durations were not measured on this machine: the archives were
+already present, and the preparation was completed by a recovery run after an
+out-of-memory failure (see PR #17).
 
 Notes per step:
 
@@ -154,6 +158,14 @@ fields are placeholders until replaced with measured execution times.
    with the measured watermark-drop counters rather than assuming delivery
    implies acceptance. Follow the producer with
    `docker compose logs -f producer`.
+6. **Open question.** `run_open_question.sh` reads the silver layer only (no
+   external request). It ranks the films of every director-actor pair, compares
+   the first film of each recurring pair with its repeat films and with the
+   director's other films of the same period. Thresholds are in the
+   `open_question` section of `conf/settings.yaml`. The summary
+   `outputs/open_question/summary.md` is injected in `REPORT.md`; CSV exports are
+   capped by `open_question.max_csv_rows` and the complete tables are in
+   `data/gold/open_question/`.
 7. **Report.** `render_report.py` only replaces the blocks between `AUTO` markers
    of `REPORT.md`; the text written by the authors is never touched.
    `python scripts/render_report.py --check` tells whether the report is up to date.
@@ -181,7 +193,7 @@ shell or file manager. Keep `data/raw/` to reuse the downloaded IMDb archives.
 | The streaming job reports no relevant event | The producer is not running or has finished: `docker compose --profile streaming up -d producer`, check `docker compose logs producer`. |
 | `UnknownTopicOrPartitionException` | The topic was not created: `docker compose up -d kafka-init`. |
 | `RobotsDisallowedError` | `wikimedia.robots.policy` is set to `enforce` in `conf/settings.yaml` (see section 6). |
-| A batch job fails after an interrupted run | Run the script again: batch jobs overwrite their outputs and collectors reuse successful cached API responses. The pending streaming job must document its own checkpoint/reset behaviour. |
+| A batch job fails after an interrupted run | Run the script again: batch jobs overwrite their outputs and collectors reuse successful cached API responses. The streaming queries resume from their checkpoints instead (see step 5 of section 3.2). |
 
 ## 5. Repository structure
 
@@ -278,6 +290,12 @@ is collected.
 | --- | --- | --- |
 | Codex (OpenAI), in the report session driven by Maxence SIMONET | GPT-6 | Creation of the `REPORT.md` heading/marker skeleton and author placeholders; implementation and tests of the configured, atomic report renderer, partial rendering and freshness checks; execution-guide updates and validation against generated preparation tables. No explanatory or methodological prose in `REPORT.md` was generated. |
 
+### Open question and results session declaration
+
+| Tool | Model | Tasks that relied on it |
+| --- | --- | --- |
+| Claude Code (Anthropic), in the open-question and results session driven by Maxence SIMONET | Claude Opus 5.5 | Implementation and tests of the open-question module (recurring director-actor collaborations), its settings and shell entry point; scheduling and monitoring of the enrichment, live streaming, exploration and open-question runs; checks and commits of the generated output tables; drafting of commit messages, pull request descriptions and these `PROJECT.md` updates. The open question was chosen by the authors among the options listed in `CLAUDE.md`. No `REPORT.md` prose was generated. |
+
 ## 8. Report assembly
 
 `REPORT.md` is a heading/marker skeleton. Quentin and Maxence write every
@@ -288,9 +306,8 @@ all author text, markers and line endings outside those blocks are preserved.
 Source files, their order and their heading offsets are declared in
 `report.blocks` in `conf/settings.yaml`. Sources are read under `paths.outputs`.
 Generated headings are nested below the report's Results headings; fenced code
-and table cells are preserved. The planned open-question source is
-`outputs/open_question/summary.md`; update its configured path when the authors
-choose the question and its implementation is available.
+and table cells are preserved. The open-question source is
+`outputs/open_question/summary.md`, produced by `scripts/run_open_question.sh`.
 
 Once all configured results exist:
 
