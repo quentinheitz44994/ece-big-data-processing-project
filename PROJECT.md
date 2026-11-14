@@ -10,7 +10,7 @@ Apache Kafka. Course: ECE Paris, Big Data Processing, fall 2026.
 
 | Name | GitHub username | Email |
 | --- | --- | --- |
-| Quentin HEITZ | quentinheitz44994 | EMAIL_TO_COMPLETE |
+| Quentin HEITZ | quentinheitz44994 | heitzquentin2@gmail.com |
 | Maxence SIMONET | maxence808 | maxence.simonet@outlook.com |
 
 Group: gr-3
