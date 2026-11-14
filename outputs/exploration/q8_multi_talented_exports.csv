@@ -1,0 +1,4 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q8_multi_talented_summary.csv,5,5,false,data/gold/exploration
+q8_multi_talented_career_roles.csv,4,4,false,data/gold/exploration
+q8_multi_talented.csv,6207,6207,false,data/gold/exploration

@@ -1,0 +1,2 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q5_series_decline.csv,171,171,false,data/gold/exploration

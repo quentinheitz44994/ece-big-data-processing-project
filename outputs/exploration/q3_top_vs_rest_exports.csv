@@ -1,0 +1,4 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q3_top_vs_rest_yearly.csv,46,46,false,data/gold/exploration
+q3_top_vs_rest_by_decade.csv,5,5,false,data/gold/exploration
+q3_top_vs_rest_stability.csv,7,7,false,data/gold/exploration

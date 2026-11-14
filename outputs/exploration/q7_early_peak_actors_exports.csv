@@ -1,0 +1,3 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q7_early_peak_actors.csv,1557,1557,false,data/gold/exploration
+q7_early_peak_actors_summary.csv,2,2,false,data/gold/exploration
