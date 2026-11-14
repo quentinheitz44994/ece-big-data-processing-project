@@ -227,7 +227,6 @@ is collected.
 
 | Tool | Model | Tasks that relied on it |
 | --- | --- | --- |
-| Codex (OpenAI), in the report session driven by Maxence SIMONET | GPT-6 | Creation of the `REPORT.md` heading/marker skeleton and author placeholders; implementation and tests of the configured, atomic report renderer, partial rendering and freshness checks; execution-guide updates and validation against generated preparation tables. No explanatory or methodological prose in `REPORT.md` was generated. |
 | Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. |
 | Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
 
@@ -243,6 +242,12 @@ is collected.
   `REPORT.md`** (methodological explanations, alternatives and trade-offs, key
   takeaways, description of the open question): these parts are written by the
   authors.
+
+### Report session declaration
+
+| Tool | Model | Tasks that relied on it |
+| --- | --- | --- |
+| Codex (OpenAI), in the report session driven by Maxence SIMONET | GPT-6 | Creation of the `REPORT.md` heading/marker skeleton and author placeholders; implementation and tests of the configured, atomic report renderer, partial rendering and freshness checks; execution-guide updates and validation against generated preparation tables. No explanatory or methodological prose in `REPORT.md` was generated. |
 
 ## 8. Report assembly
 
