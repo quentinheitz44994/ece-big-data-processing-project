@@ -102,10 +102,9 @@ repository on the Windows drive.
 
 Notes per step:
 
-Steps 6 and 7 describe the planned interface. Their scripts and `REPORT.md` are
-not delivered yet. Run those steps only after
-the corresponding implementations have landed and been tested. `DURATION_*`
-fields are placeholders, not measurements from Maxence's installation.
+Run a pipeline step only after its implementation has landed and been tested.
+Steps still marked as pending describe their planned interface. `DURATION_*`
+fields are placeholders until replaced with measured execution times.
 
 1. **Download.** Existing files are checked with `gzip --test` before being
    skipped (`--force` downloads again). An invalid existing archive fails the step
