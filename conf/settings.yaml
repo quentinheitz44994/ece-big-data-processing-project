@@ -216,6 +216,26 @@ exploration:
     min_titles_per_role: 3
     max_md_rows: 30
 
+# ------------------------------------------------------------- open question
+# Recurring director-actor collaborations (src/imdb_project/open_question/),
+# section 5 of REPORT.md. Kept next to exploration because it shares its inputs.
+# Films follow exploration.feature_film.
+open_question:
+  min_votes: 1000
+  actor_categories: [actor, actress]
+  # A director acting in their own film is not a collaboration.
+  exclude_self_direction: true
+  # Films needed for a director-actor pair to be "recurring" (>= 2).
+  min_collaborations: 2
+  # |repeat mean - first rating| up to this value is reported as "equal".
+  equal_tolerance: 0.05
+  # Collaboration ranks from this value on are grouped ("5+").
+  rank_cap: 5
+  # Lower bounds of the "number of collaborations" buckets: 2, 3, 4-5, 6+.
+  collaboration_buckets: [2, 3, 4, 6]
+  max_md_rows: 30
+  max_csv_rows: 50000
+
 # ---------------------------------------------------------------- 3. enrichment
 enrichment:
   # Any of the five scope parameters can be set to null to lift the restriction
