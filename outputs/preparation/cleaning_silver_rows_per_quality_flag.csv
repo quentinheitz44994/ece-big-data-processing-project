@@ -1,0 +1,11 @@
+table,dq_flag,rows
+name_basics,DQ01,28
+name_basics,DQ02,2
+name_basics,DQ05:knownForTitles,6
+title_basics,DQ07,3
+title_basics,DQ08,446
+title_crew,DQ05:directors,419
+title_crew,DQ05:writers,812
+title_episode,DQ14,7125
+title_principals,DQ03,23742
+title_principals,DQ04,1159

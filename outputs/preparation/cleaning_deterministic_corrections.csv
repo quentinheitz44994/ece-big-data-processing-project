@@ -1,0 +1,8 @@
+table,column,correction,values_set_to_null
+name_basics,birthYear,birthYear after the reference year set to null,0
+name_basics,deathYear,deathYear after the reference year set to null,0
+title_basics,runtimeMinutes,runtimeMinutes <= 0 set to null,4
+title_episode,episodeNumber,negative episodeNumber set to null,0
+title_episode,seasonNumber,negative seasonNumber set to null,0
+title_ratings,averageRating,"averageRating outside [rating_min, rating_max] set to null",0
+title_ratings,numVotes,numVotes <= 0 set to null,0

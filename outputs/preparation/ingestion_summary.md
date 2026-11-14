@@ -13,10 +13,10 @@
 
 | table | source_file | rows | columns | malformed_rows |
 | --- | --- | --- | --- | --- |
-| name_basics | name.basics.tsv.gz | 15803779 | 6 | 0 |
-| title_akas | title.akas.tsv.gz | 60321594 | 8 | 0 |
-| title_basics | title.basics.tsv.gz | 12951113 | 9 | 0 |
-| title_crew | title.crew.tsv.gz | 12951113 | 3 | 0 |
-| title_episode | title.episode.tsv.gz | 10023959 | 4 | 0 |
-| title_principals | title.principals.tsv.gz | 102649609 | 6 | 0 |
-| title_ratings | title.ratings.tsv.gz | 1730885 | 3 | 0 |
+| name_basics | name.basics.tsv.gz | 15811387 | 6 | 0 |
+| title_akas | title.akas.tsv.gz | 60385482 | 8 | 0 |
+| title_basics | title.basics.tsv.gz | 12958477 | 9 | 0 |
+| title_crew | title.crew.tsv.gz | 12958477 | 3 | 0 |
+| title_episode | title.episode.tsv.gz | 10030795 | 4 | 0 |
+| title_principals | title.principals.tsv.gz | 102738762 | 6 | 0 |
+| title_ratings | title.ratings.tsv.gz | 1731756 | 3 | 0 |
