@@ -42,6 +42,13 @@ then run `wsl --shutdown` and restart Docker Desktop. With less memory, lower
 `SPARK_DRIVER_MEMORY` in `.env` (the runs of the report were done with `5g` on an
 8 GB Docker VM).
 
+The current defaults use a `4g` driver heap and `spark.master: "local[4]"`.
+Using every host CPU can exhaust native memory while reading the largest IMDb
+table, even when the JVM heap fits. Read splits and Parquet vectorized batches
+are bounded in `spark.extra_conf`. Existing clones should set
+`SPARK_DRIVER_MEMORY=4g` in `.env` and recreate the Spark service only after active
+jobs have stopped. The recovery on Maxence's Windows machine uses these settings.
+
 The container user is `jovyan` (uid 1000). On a Linux host whose user has another
 uid, make the existing mounted output folders writable first:
 `chmod -R a+rwX data outputs`. Apply the same permission adjustment to `REPORT.md`
@@ -86,7 +93,7 @@ and not needed to reproduce the report.
 | 3. Data exploration | `docker compose exec spark bash scripts/run_exploration.sh` | DURATION_EXPLORATION | `data/gold/exploration/`, `outputs/exploration/` |
 | 4. Data enrichment | `docker compose exec spark bash scripts/run_enrichment.sh` | DURATION_ENRICHMENT | `data/enrichment/`, `data/gold/enriched_*`, `outputs/enrichment/` |
 | 5a. Start the producer | `docker compose --profile streaming up -d producer` | a few seconds | events in the Kafka topic `wikistreams` |
-| 5b. Streaming job (pending implementation) | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | planned: `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
+| 5b. Streaming job | `docker compose exec spark bash scripts/run_streaming.sh` | DURATION_STREAMING | `data/gold/wiki_lookup/`, `data/streaming/`, `outputs/streaming/` |
 | 6. Open question (pending author choice and implementation) | `docker compose exec spark bash scripts/run_open_question.sh` | DURATION_OPEN_QUESTION | planned: `data/gold/open_question/`, `outputs/open_question/` |
 | 7. Render the report | `docker compose exec spark python scripts/render_report.py` | not measured | generated tables injected in `REPORT.md` |
 
@@ -124,7 +131,28 @@ fields are placeholders until replaced with measured execution times.
    Wikipedia pages linked to IMDb identifiers (first run only), runs the three
    streaming queries for `streaming.run_minutes` (20 by default; another duration
    can be given as argument, e.g. `bash scripts/run_streaming.sh 30`), injects the
-   late test events and writes the summary. Follow the producer with
+   late test events and writes the summary. Events are deduplicated within the
+   watermark; finalized window batches are written to Parquet and shown on the
+   console. Each query has its own checkpoint and resumes on subsequent runs.
+   `streaming.starting_offsets` is used only for a fresh checkpoint (default:
+   earliest). Keep checkpoint and sink folders together; changing a window or
+   state schema or `streaming.shuffle_partitions` requires a new configured
+   checkpoint/sink set. Streaming uses its own partition count (4 by default),
+   independently of the larger batch setting.
+   Shutdown first waits for idle trigger boundaries, for at most
+   `streaming.stop_grace_seconds`, then calls `stop()` on remaining queries.
+   This grace and report generation are additional to the requested run duration.
+
+   Progress is appended to `outputs/streaming/progress.jsonl`. The summary selects
+   the current application run and reports inputs separately for each query;
+   sliding-window counts are not distinct-event counts. Window state resumes
+   across runs: windows finalized in the current run can contain edits read in
+   an earlier run; matched-event counts select only newly appended current-run
+   events. A short run may produce
+   matched events before any window becomes final. Late injection waits for
+   observed watermarks and uses new event ids; compare its observation table
+   with the measured watermark-drop counters rather than assuming delivery
+   implies acceptance. Follow the producer with
    `docker compose logs -f producer`.
 7. **Report.** `render_report.py` only replaces the blocks between `AUTO` markers
    of `REPORT.md`; the text written by the authors is never touched.
@@ -147,7 +175,7 @@ shell or file manager. Keep `data/raw/` to reuse the downloaded IMDb archives.
 | --- | --- |
 | `port is already allocated` at `docker compose up` | Another service uses 8888, 4040 or 9092: change `JUPYTER_PORT`, `SPARK_UI_PORT` or `KAFKA_EXTERNAL_PORT` in `.env`. |
 | `MissingContactError` during a collection step | `WIKIMEDIA_CONTACT_EMAIL` is empty: set it in `.env`, then `docker compose up -d` to recreate the containers. |
-| A Spark job is killed or the container exits with code 137 | Out of memory: give Docker more memory (section 2) or lower `SPARK_DRIVER_MEMORY`, then `docker compose up -d`. |
+| A Spark job is killed, exits with code 137, or reports `Cannot allocate memory` | Use the bounded `spark.master` and Parquet settings in `conf/settings.yaml`; lower `SPARK_DRIVER_MEMORY` to `4g`. Wait for active jobs to stop before recreating the Spark service with `docker compose up -d`. |
 | `No space left on device` | Spark temporary files fill the Docker disk: `docker compose restart spark` clears `/tmp`, and `docker system prune` frees unused images. |
 | `bash\r: No such file or directory` | The scripts were checked out with CRLF line endings: clone again (the repository forces LF through `.gitattributes`) or run `git checkout -- scripts`. |
 | The streaming job reports no relevant event | The producer is not running or has finished: `docker compose --profile streaming up -d producer`, check `docker compose logs producer`. |
@@ -229,6 +257,7 @@ is collected.
 | --- | --- | --- |
 | Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. |
 | Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
+| Codex (OpenAI), in the streaming session driven by Maxence SIMONET | GPT-6 | Implementation of Kafka JSON parsing, watermark deduplication, tumbling/sliding queries, append Parquet/console output, progress listener, late-event injection, timed shutdown and generated streaming tables; shell entry point, execution-guide updates and synthetic regression/integration tests. No `REPORT.md` prose was generated. |
 
 - The brief given to the tool is versioned in [CLAUDE.md](CLAUDE.md): it fixes the
   architecture, the definitions and the default thresholds that the tool

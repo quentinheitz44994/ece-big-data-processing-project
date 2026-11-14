@@ -24,7 +24,7 @@ submit() {
   shift
   log "spark-submit ${module} $*"
   spark-submit \
-    --driver-memory "${SPARK_DRIVER_MEMORY:-6g}" \
+    --driver-memory "${SPARK_DRIVER_MEMORY:-4g}" \
     --conf spark.ui.showConsoleProgress=false \
     "${PROJECT_ROOT}/src/imdb_project/${module}" --config "${CONFIG}" "$@"
 }
