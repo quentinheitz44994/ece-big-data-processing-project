@@ -46,7 +46,8 @@ Conséquences pour Claude Code :
 3. La section *AI/LLM declaration* de `PROJECT.md` doit être **exacte** : outil
    (Claude Code, Anthropic), et liste des tâches où il a été utilisé. Ne pas minimiser
    ni omettre l'usage. Les membres la relisent et la complètent.
-4. Ne pas retirer les trailers d'attribution par défaut des commits/PR.
+4. Ne pas ajouter de trailer `Co-Authored-By` d'outil IA ni de mention « Generated with ... »
+   dans les commits et les PR : l'usage de l'IA est déclaré uniquement dans `PROJECT.md`.
 
 ### 1.2 Standards Git (audités par l'enseignant)
 

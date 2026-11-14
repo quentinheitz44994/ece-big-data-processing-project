@@ -10,7 +10,7 @@ Apache Kafka. Course: ECE Paris, Big Data Processing, fall 2026.
 
 | Name | GitHub username | Email |
 | --- | --- | --- |
-| Quentin HEITZ | quentinheitz44994 | EMAIL_TO_COMPLETE |
+| Quentin HEITZ | quentinheitz44994 | heitzquentin2@gmail.com |
 | Maxence SIMONET | maxence808 | maxence.simonet@outlook.com |
 
 Group: gr-3
@@ -255,7 +255,7 @@ is collected.
 
 | Tool | Model | Tasks that relied on it |
 | --- | --- | --- |
-| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2 (as declared by the author) | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. |
+| Claude Code (Anthropic), agentic coding assistant, in sessions driven by Quentin HEITZ | Claude Fable 5.2, then Claude Opus 5.5 | Generation and debugging of the code delivered in PRs #1–#13: Docker and Compose configuration, PySpark preparation/exploration/enrichment jobs, Wikimedia HTTP clients, Kafka producer and lookup, shell scripts, settings and unit tests. Generation of the existing preparation tables in `outputs/`. Drafting of commit messages, PR descriptions, `README.md` and `PROJECT.md`. Those PRs did not implement the Structured Streaming job, open question or report renderer. Review support for PRs #15–#18: summaries of the changes, execution of tests, Ruff and Black on the PR branches, and drafts of the review comments of PRs #15 and #16, posted by Quentin. Drafting of the working instructions given to Maxence, of this documentation PR and of the `CLAUDE.md` update. Rendering of the result tables into `REPORT.md` with `scripts/render_report.py`. No `REPORT.md` prose was generated. |
 | Codex (OpenAI), in sessions driven by Maxence SIMONET | GPT-6 | Windows PowerShell and Docker setup; execution of tests, Ruff and Black; review of PRs #1–#13, synthetic reproductions, merge-conflict checks and publication of review comments. Implementation of the review corrections and regression tests for primary keys, array cleanup, Q5/Q7, API errors, language-scoped caching, Kafka backpressure, download integrity and CSV export metadata. Updates to the execution guide and preparation of the correction PR. No `REPORT.md` prose was generated. |
 | Codex (OpenAI), in the streaming session driven by Maxence SIMONET | GPT-6 | Implementation of Kafka JSON parsing, watermark deduplication, tumbling/sliding queries, append Parquet/console output, progress listener, late-event injection, timed shutdown and generated streaming tables; shell entry point, execution-guide updates and synthetic regression/integration tests. No `REPORT.md` prose was generated. |
 
