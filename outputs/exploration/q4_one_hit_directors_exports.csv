@@ -1,0 +1,2 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q4_one_hit_directors.csv,47,47,false,data/gold/exploration

@@ -1,0 +1,64 @@
+{
+  "application_run_id": "f10bdae5cc954d749056961a2a8ee769",
+  "reference_event_time": "2026-11-14T15:03:19.636000+00:00",
+  "status": "injected",
+  "events": [
+    {
+      "event_id": "1fea66cf-494b-4298-ad05-f3e77f14b5b5-late-c17d6e3d90244594aaf3aec723c13da8",
+      "event_time": "2026-11-14T14:33:19.636000Z",
+      "offset_minutes": 30.0
+    },
+    {
+      "event_id": "1fea66cf-494b-4298-ad05-f3e77f14b5b5-late-812625e76d164928aa6849076548a0c9",
+      "event_time": "2026-11-14T14:58:19.636000Z",
+      "offset_minutes": 5.0
+    },
+    {
+      "event_id": "c9607284-a0aa-4ad0-9c8f-66bfe04b5016-late-ff24a54793234b2ba7accab3621c2bd5",
+      "event_time": "2026-11-14T14:33:19.636000Z",
+      "offset_minutes": 30.0
+    },
+    {
+      "event_id": "c9607284-a0aa-4ad0-9c8f-66bfe04b5016-late-4656ca6caad34b05be29e0c2f4794ad2",
+      "event_time": "2026-11-14T14:58:19.636000Z",
+      "offset_minutes": 5.0
+    },
+    {
+      "event_id": "f0a313e8-f25d-4f29-b050-ca1796f83d26-late-f8b61795ac0a4643b36b1cf281c0c522",
+      "event_time": "2026-11-14T14:33:19.636000Z",
+      "offset_minutes": 30.0
+    },
+    {
+      "event_id": "f0a313e8-f25d-4f29-b050-ca1796f83d26-late-8f355476b32e496b967885c7addf10d7",
+      "event_time": "2026-11-14T14:58:19.636000Z",
+      "offset_minutes": 5.0
+    },
+    {
+      "event_id": "3d22f1cc-c006-4707-b617-1343a71dd326-late-0c0d20307a27467bad85f763b1dcfda9",
+      "event_time": "2026-11-14T14:33:19.636000Z",
+      "offset_minutes": 30.0
+    },
+    {
+      "event_id": "3d22f1cc-c006-4707-b617-1343a71dd326-late-14529f5fc3eb4469a216e77e67faee54",
+      "event_time": "2026-11-14T14:58:19.636000Z",
+      "offset_minutes": 5.0
+    },
+    {
+      "event_id": "523daf65-2593-46f6-80f2-61bf8d02d320-late-eccf785acb9d49cd901dcd4cc71889a2",
+      "event_time": "2026-11-14T14:33:19.636000Z",
+      "offset_minutes": 30.0
+    },
+    {
+      "event_id": "523daf65-2593-46f6-80f2-61bf8d02d320-late-64f23c2e5bfb4b5cbcb7dca7f959c32d",
+      "event_time": "2026-11-14T14:58:19.636000Z",
+      "offset_minutes": 5.0
+    }
+  ],
+  "delivery_errors": [],
+  "undelivered": 0,
+  "watermarks_before_injection": {
+    "matched_events": "2026-11-14T14:53:09.427Z",
+    "tumbling": "2026-11-14T14:53:09.427Z",
+    "sliding": "2026-11-14T14:53:09.427Z"
+  }
+}

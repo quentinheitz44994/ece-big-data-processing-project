@@ -1,0 +1,4 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q6_multilingual_actors.csv,650,650,false,data/gold/exploration
+q6_multilingual_actors_three_or_more.csv,74,74,false,data/gold/exploration
+q6_multilingual_actors_coverage.csv,3,3,false,data/gold/exploration

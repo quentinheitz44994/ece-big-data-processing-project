@@ -1,0 +1,3 @@
+file,total_rows,exported_rows,truncated,gold_directory
+q2_top_genres.csv,138,138,false,data/gold/exploration
+q2_top_genres_all_genres.csv,975,975,false,data/gold/exploration

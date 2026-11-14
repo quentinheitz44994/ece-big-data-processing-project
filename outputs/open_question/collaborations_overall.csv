@@ -1,0 +1,17 @@
+metric,value
+director-actor pairs (at least one film),469141
+recurring pairs (>= 2 films),26630
+share of pairs that are recurring,0.05676331849060304
+"mean rating, films of one-off pairs",6.127637731039918
+"mean rating, first film of recurring pairs",6.6057641757417915
+mean of pair repeat-film mean ratings,6.325160912660926
+mean delta (repeat - first),-0.28060326308066685
+median delta (approx.),-0.20000000000000018
+standard deviation of delta,0.8531325819662147
+paired t statistic of delta,-53.6737293431494
+share of pairs: repeats higher,0.3285016898235073
+share of pairs: repeats equal,0.06349981224183252
+share of pairs: repeats lower,0.6079984979346602
+recurring pairs with a director baseline,21573
+mean excess vs director baseline,0.1175004234971893
+share of pairs with positive excess,0.5705743290223891
