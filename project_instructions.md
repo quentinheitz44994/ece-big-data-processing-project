@@ -25,7 +25,7 @@ The project will be submitted via a GitHub repo including two primary Markdown f
 - **Late Policy:** Pre-approved extensions must be requested and approved by Friday, November 13, 2026. Unapproved late submissions incur a 1-point deduction per day.
 - **Group Size:** Groups of 2-3 students
 - **Project Submission:** Once the project is complete and ready for grading, students will send an email to `joe@adaltas.com` following the guidelines detailed in the [README](https://github.com/adaltas/ece-big-data-processing-fall-2026/blob/main/README.md).
-- **AI / LLM Policy:** AI tools may be used for coding (must be declared in `PROJECT.md`). Using AI tools to redact PROJECT.md is authorized and doesn't have to be declared.
+- **AI / LLM Policy:** AI tools may be used for coding (must be declared in `PROJECT.md`). Using AI tools to redact REPORT.md is authorized and doesn't have to be declared.
 - **Report Formatting and Code Style:** Markdown reports must follow the [Markdown Guidelines](https://www.markdownguide.org/) and Python code should follow the [Python Style Guides](https://www.python.org/doc/essays/styleguide/).
 - **Core Technology Stack:** Apache Spark (PySpark Structured Streaming & Batch) and Apache Kafka will be used unless otherwise noted in the instructions.  
 
