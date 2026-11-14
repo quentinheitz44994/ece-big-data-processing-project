@@ -174,7 +174,7 @@ shell or file manager. Keep `data/raw/` to reuse the downloaded IMDb archives.
 │   │                             # select_scope, build_enrichment
 │   ├── streaming/                # admin, producer, relevance, build_lookup, stream_job,
 │   │                             # metrics_listener, late_event_injector, summary
-│   └── open_question/            # planned; question and module chosen by the authors
+│   └── open_question/            # collaborations (recurring director-actor pairs)
 ├── tests/                        # pytest, synthetic data only, no network access
 ├── outputs/                      # generated tables (Markdown, CSV) injected in REPORT.md
 ├── notebooks/                    # optional interactive exploration
