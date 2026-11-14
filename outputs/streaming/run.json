@@ -1,0 +1,27 @@
+{
+  "application_run_id": "f10bdae5cc954d749056961a2a8ee769",
+  "started_at": "2026-11-14T14:51:24Z",
+  "status": "completed",
+  "run_minutes": 20.0,
+  "queries": [
+    {
+      "name": "matched_events",
+      "id": "3ad11220-15db-43e0-85af-84cc600330f6",
+      "runId": "b6fe3ddc-bf53-4432-b01c-636bc70badd1"
+    },
+    {
+      "name": "tumbling",
+      "id": "0c020c9d-2872-4d2f-acd2-1ae7b8528eee",
+      "runId": "2e145b42-340a-4a82-8e1b-1664615d3b84"
+    },
+    {
+      "name": "sliding",
+      "id": "917b84a0-13af-427a-803e-e1b0f0e138c2",
+      "runId": "f83faa28-3c1f-4cc7-825c-88c5c21efa8c"
+    }
+  ],
+  "late_injection": "injected",
+  "greatest_event_time": "2026-11-14T15:11:19.340000+00:00",
+  "duration_seconds": 1236.99,
+  "finished_at": "2026-11-14T15:12:06Z"
+}
